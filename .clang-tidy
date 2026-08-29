@@ -1,0 +1,28 @@
+---
+# Включаем проверки:
+# bugprone-*    (поиск частых багов)
+# performance-* (поиск проблем с производительностью)
+# modernize-*   (советы по использованию современного C++)
+# readability-* (проверки на читаемость кода)
+Checks: >
+  -*,
+  bugprone-*,
+  performance-*,
+  modernize-*,
+  readability-*
+
+# Отключаем слишком назойливые проверки:
+# -modernize-use-trailing-return-type (чтобы не заставлял писать auto func() -> int)
+# -readability-magic-numbers (в графике полно чисел вроде 0.5f или 3.14f, это нормально)
+# -readability-braces-around-statements (чтобы разрешал if (x) return; на одной строке)
+CheckOptions:
+  - key:             modernize-use-trailing-return-type
+    value:           false
+  - key:             readability-magic-numbers
+    value:           false
+  - key:             readability-braces-around-statements
+    value:           false
+
+# Предупреждения как ошибки (оставьте пустым, чтобы просто подсвечивало, но компилировалось)
+WarningsAsErrors: ''
+...
