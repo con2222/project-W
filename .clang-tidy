@@ -1,9 +1,4 @@
----
-# Включаем проверки:
-# bugprone-*    (поиск частых багов)
-# performance-* (поиск проблем с производительностью)
-# modernize-*   (советы по использованию современного C++)
-# readability-* (проверки на читаемость кода)
+# Enable checks for common bugs, performance issues, modern C++ idioms, and readability:
 Checks: >
   -*,
   bugprone-*,
@@ -11,18 +6,18 @@ Checks: >
   modernize-*,
   readability-*
 
-# Отключаем слишком назойливые проверки:
-# -modernize-use-trailing-return-type (чтобы не заставлял писать auto func() -> int)
-# -readability-magic-numbers (в графике полно чисел вроде 0.5f или 3.14f, это нормально)
-# -readability-braces-around-statements (чтобы разрешал if (x) return; на одной строке)
+# Disable overly strict or context-inappropriate checks:
+# - modernize-use-trailing-return-type: Prevents forcing trailing return types (auto func() -> int)
+# - readability-magic-numbers: Allows numeric literals (e.g., 0.5f, 3.14f) commonly used in graphics programming
+# - readability-braces-around-statements: Allows single-line conditional statements without braces (e.g., if (x) return;)
 CheckOptions:
-  - key:             modernize-use-trailing-return-type
-    value:           false
-  - key:             readability-magic-numbers
-    value:           false
-  - key:             readability-braces-around-statements
-    value:           false
+  - key:               modernize-use-trailing-return-type
+    value:             false
+  - key:               readability-magic-numbers
+    value:             false
+  - key:               readability-braces-around-statements
+    value:             false
 
-# Предупреждения как ошибки (оставьте пустым, чтобы просто подсвечивало, но компилировалось)
+# Treat warnings as errors (leave empty to treat them as warnings only)
 WarningsAsErrors: ''
 ...
