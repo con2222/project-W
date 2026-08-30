@@ -16,7 +16,8 @@ void syncFromWindow(WindowData& data) {
 }
 
 WindowData createWindow(GPUContext ctx) {
-    SDL_Window* window = SDL_CreateWindow("Main", 1920, 1080, 0);
+    SDL_Window* window =
+        SDL_CreateWindow("Main", 1920, 1080, SDL_WINDOW_RESIZABLE);
 
     wgpu::Surface surface = SDL_GetWGPUSurface(ctx.instance.Get(), window);
     C2Core::Log::info("surface = %p", reinterpret_cast<void*>(surface.Get()));

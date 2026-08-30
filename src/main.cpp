@@ -31,11 +31,16 @@ const char* shader = R"(
         }
     )";
 
-bool pollEvent(int& running) {
+bool pollEvent(int& running, c2::WindowData& data) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_EVENT_QUIT) {
-            running = 0;
+        switch (event.type) {
+            case SDL_EVENT_QUIT: {
+                running = 0;
+            }
+            case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
+                c2::syncFromWindow(data);
+            }
         }
     }
 
@@ -50,9 +55,6 @@ int main(int argc, char** argv) {
     c2::GPUContext context;
     c2::getGPUContext(context);
     c2::WindowData windowData = c2::createWindow(context);
-
-    C2Core::Log::info("same: %d", c2::isSameConfig(windowData.currentConfig,
-                                                   windowData.targetConfig));
 
     wgpu::ShaderModule module =
         c2::utils::CreateShaderModule(context.device, shader);
@@ -122,14 +124,14 @@ int main(int argc, char** argv) {
 
     int running = 1;
     while (running) {
-        bool success = pollEvent(running);
+        bool success = pollEvent(running, windowData);
         context.instance.ProcessEvents();
-
-        c2::syncFromWindow(windowData);
 
         if (!c2::isSameConfig(windowData.currentConfig,
                               windowData.targetConfig)) {
-            C2Core::Log::info("asdsad");
+            C2Core::Log::info("Window Resized. New Size: %dx%d",
+                              windowData.targetConfig.width,
+                              windowData.targetConfig.height);
             windowData.surface.Configure(&windowData.targetConfig);
             windowData.currentConfig = windowData.targetConfig;
         }
