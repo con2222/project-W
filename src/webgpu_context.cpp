@@ -1,9 +1,10 @@
 #include <C2Core/c2_log.hpp>
 #include <webgpu_context.hpp>
 
-namespace C2Context {
+namespace c2 {
 
 void getGPUContext(GPUContext& context) {
+    // Init instance
     static constexpr auto kTimedWaitAny =
         wgpu::InstanceFeatureName::TimedWaitAny;
     wgpu::InstanceDescriptor instanceDescriptor = {
@@ -15,6 +16,7 @@ void getGPUContext(GPUContext& context) {
     }
     context.instance = instance;
 
+    // Request adapter
     wgpu::RequestAdapterOptions options = {};
     options.backendType = wgpu::BackendType::D3D12;
     wgpu::Adapter adapter;
@@ -27,18 +29,18 @@ void getGPUContext(GPUContext& context) {
         }
         *static_cast<wgpu::Adapter*>(userdata) = adapter;
     };
-
-    auto callbackMode = wgpu::CallbackMode::WaitAnyOnly;
     void* userdata = &adapter;
-    instance.WaitAny(instance.RequestAdapter(&options, callbackMode,
-                                             adapterCallback, userdata),
-                     UINT64_MAX);
+    wgpu::Future adapterFuture = instance.RequestAdapter(
+        &options, wgpu::CallbackMode::WaitAnyOnly, adapterCallback, userdata);
+
+    instance.WaitAny(adapterFuture, UINT64_MAX);
     if (adapter == nullptr) {
         C2Core::Log::error("RequestAdapter failed");
         return;
     }
     context.adapter = adapter;
 
+    // Request Device from adapter
     wgpu::DeviceDescriptor deviceDescriptor = {};
     deviceDescriptor.SetUncapturedErrorCallback([](const wgpu::Device&,
                                                    wgpu::ErrorType errorType,
@@ -70,13 +72,7 @@ void getGPUContext(GPUContext& context) {
     }
     context.device = device;
 
-    wgpu::Limits limits = {};
-
-    wgpu::Status success = device.GetLimits(&limits);
-    if (success == wgpu::Status::Success) {
-        C2Core::Log::info("maxTextireDimension1D: %d",
-                          limits.maxTextureDimension1D);
-    }
+    context.queue = device.GetQueue();
 }
 
-}  // namespace C2Context
+}  // namespace c2
