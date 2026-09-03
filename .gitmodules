@@ -1,0 +1,3 @@
+[submodule "vendor/c2-core-lib"]
+	path = vendor/c2-core-lib
+	url = git@github.com:con2222/c2-core-lib.git

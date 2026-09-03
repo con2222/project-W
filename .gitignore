@@ -18,6 +18,7 @@ temp/
 *.out
 .vs/
 imgui.ini
+*.mp3
 
 *.spv
 *.json

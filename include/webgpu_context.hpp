@@ -3,7 +3,7 @@
 #include <webgpu/webgpu_cpp.h>
 #include <webgpu/webgpu_cpp_print.h>
 
-namespace c2 {
+namespace c2::gpu {
 
 struct GPUContext {
     wgpu::Instance instance;
@@ -12,6 +12,12 @@ struct GPUContext {
     wgpu::Queue queue;
 };
 
-void getGPUContext(GPUContext& context);
+GPUContext getGPUContext();
 
-}  // namespace c2
+wgpu::Instance initInstance();
+wgpu::Adapter createAdapter(const wgpu::Instance& instance);
+wgpu::Device createDevice(const wgpu::Instance& instance,
+                          const wgpu::Adapter& adapter);
+wgpu::Queue createQueue(const wgpu::Device& device);
+
+}  // namespace c2::gpu

@@ -28,9 +28,12 @@ find_package(Dawn REQUIRED)
 add_library(webgpu ALIAS dawn::webgpu_dawn)
 
 add_subdirectory(vendor/c2-core-lib)
+
 add_subdirectory(vendor/sdl3webgpu)
 target_compile_definitions(sdl3webgpu PRIVATE WEBGPU_BACKEND_DAWN)
 
+add_subdirectory(vendor/imgui)
+target_compile_definitions(imgui PRIVATE IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
 
 set(SOURCES 
     src/main.cpp
@@ -38,6 +41,7 @@ set(SOURCES
     src/miniaudio.c
     src/window.cpp
     src/webgpu_utils.cpp
+    src/render.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
@@ -47,7 +51,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu)
+target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui)
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

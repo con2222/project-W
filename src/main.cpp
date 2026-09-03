@@ -1,9 +1,13 @@
 #include <SDL3/SDL.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_wgpu.h>
+#include <imgui.h>
 #include <sdl3webgpu.h>
 #include <webgpu/webgpu_cpp.h>
 #include <webgpu/webgpu_cpp_print.h>
 
 #include <C2Core/c2_log.hpp>
+#include <hardcode.hpp>
 #include <webgpu_context.hpp>
 #include <webgpu_utils.hpp>
 #include <window.hpp>
@@ -15,126 +19,120 @@ extern "C" {
 #include <cstdlib>
 #include <iostream>
 
-const char* shader = R"(
-        @vertex fn vs(@builtin(vertex_index) VertexIndex : u32)
-                            -> @builtin(position) vec4f {
-            var pos = array(
-                vec2f( 0.0,  0.5),
-                vec2f(-0.5, -0.5),
-                vec2f( 0.5, -0.5)
-            );
-            return vec4f(pos[VertexIndex], 0, 1);
-        }
-
-        @fragment fn fs() -> @location(0) vec4f {
-            return vec4f(1, 0, 0, 1);
-        }
-    )";
+void initImGui(c2::gpu::GPUContext& ctx, c2::WindowData data);
 
 bool pollEvent(int& running, c2::WindowData& data) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
+        ImGui_ImplSDL3_ProcessEvent(&event);
         switch (event.type) {
             case SDL_EVENT_QUIT: {
                 running = 0;
+                break;
             }
             case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
                 c2::syncFromWindow(data);
+                C2Core::Log::info("Window Resized. New Size: %dx%d",
+                                  data.targetConfig.width,
+                                  data.targetConfig.height);
+                data.surface.Configure(&data.targetConfig);
+                data.currentConfig = data.targetConfig;
+                break;
             }
+            case SDL_EVENT_KEY_DOWN:
+                if (event.key.key == SDLK_ESCAPE) running = false;
         }
     }
 
     return true;
 }
 
-int main(int argc, char** argv) {
+bool setup(c2::gpu::GPUContext& ctx, c2::WindowData data) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == false) {
         C2Core::Log::error("SDL init error: %s", SDL_GetError());
+        return false;
     };
 
-    c2::GPUContext context;
-    c2::getGPUContext(context);
+    initImGui(ctx, data);
+
+    return true;
+}
+
+void initImGui(c2::gpu::GPUContext& ctx, c2::WindowData data) {
+    float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    (void)io;
+    io.ConfigFlags |=
+        ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+    io.ConfigFlags |=
+        ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
+    ImGui::StyleColorsDark();
+
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.ScaleAllSizes(
+        main_scale);  // Bake a fixed style scale. (until we have a solution for
+                      // dynamic style scaling, changing this requires resetting
+                      // Style + calling this again)
+    style.FontScaleDpi =
+        main_scale;  // Set initial font scale. (in docking branch: using
+                     // io.ConfigDpiScaleFonts=true automatically overrides this
+                     // for every window depending on the current monitor)
+
+    ImGui_ImplSDL3_InitForOther(data.window);
+
+    ImGui_ImplWGPU_InitInfo init_info;
+    init_info.Device = ctx.device.Get();
+    init_info.NumFramesInFlight = 3;
+    init_info.RenderTargetFormat =
+        static_cast<WGPUTextureFormat>(data.currentConfig.format);
+    init_info.DepthStencilFormat = WGPUTextureFormat_Undefined;
+    ImGui_ImplWGPU_Init(&init_info);
+}
+
+int main(int argc, char** argv) {
+    c2::gpu::GPUContext context = c2::gpu::getGPUContext();
     c2::WindowData windowData = c2::createWindow(context);
+    setup(context, windowData);
+    ImGuiIO& io = ImGui::GetIO();
 
-    wgpu::ShaderModule module =
-        c2::utils::CreateShaderModule(context.device, shader);
+    ma_result result;
+    ma_engine engine;
 
-    wgpu::RenderPipelineDescriptor renderPipelineDescriptor = {};
-    renderPipelineDescriptor.vertex.module = module;
-    renderPipelineDescriptor.vertex.bufferCount = 0;
-    renderPipelineDescriptor.vertex.buffers = nullptr;
+    result = ma_engine_init(NULL, &engine);
+    if (result != MA_SUCCESS) {
+        return -1;
+    }
 
-    renderPipelineDescriptor.primitive.topology =
-        wgpu::PrimitiveTopology::TriangleList;
-    renderPipelineDescriptor.primitive.stripIndexFormat =
-        wgpu::IndexFormat::Undefined;
-    renderPipelineDescriptor.primitive.frontFace = wgpu::FrontFace::CCW;
-    renderPipelineDescriptor.primitive.cullMode = wgpu::CullMode::None;
+    ma_engine_play_sound(&engine, "Suffocation-Crystal-Castles.mp3", NULL);
 
-    wgpu::StencilFaceState stencilFace;
-    stencilFace.compare = wgpu::CompareFunction::Always;
-    stencilFace.failOp = wgpu::StencilOperation::Keep;
-    stencilFace.depthFailOp = wgpu::StencilOperation::Keep;
-    stencilFace.passOp = wgpu::StencilOperation::Keep;
-
-    /*
-    wgpu::DepthStencilState& cDepthStencil =
-        renderPipelineDescriptor.depthStencil;
-    cDepthStencil.format = wgpu::TextureFormat::Depth24PlusStencil8;
-    cDepthStencil.depthWriteEnabled = wgpu::OptionalBool::False;
-    cDepthStencil.depthCompare = wgpu::CompareFunction::Always;
-    cDepthStencil.stencilBack = stencilFace;
-    cDepthStencil.stencilFront = stencilFace;
-    cDepthStencil.stencilReadMask = 0xff;
-    cDepthStencil.stencilWriteMask = 0xff;
-    cDepthStencil.depthBias = 0;
-    cDepthStencil.depthBiasSlopeScale = 0.0;
-    cDepthStencil.depthBiasClamp = 0.0;
-    */
-
-    renderPipelineDescriptor.depthStencil = nullptr;
-    renderPipelineDescriptor.layout = nullptr;
-
-    wgpu::MultisampleState& multisample = renderPipelineDescriptor.multisample;
-    multisample.count = 1;
-    multisample.mask = 0xFFFFFFFF;
-    multisample.alphaToCoverageEnabled = false;
-
-    wgpu::FragmentState fragmentState = {};
-    fragmentState.module = module;
-    fragmentState.targetCount = 1;
-
-    wgpu::ColorTargetState colorTarget = {};
-    colorTarget.format = windowData.currentConfig.format;
-    fragmentState.targets = &colorTarget;
-
-    renderPipelineDescriptor.fragment = &fragmentState;
-
-    wgpu::BlendComponent blendComponent;
-    blendComponent.srcFactor = wgpu::BlendFactor::One;
-    blendComponent.dstFactor = wgpu::BlendFactor::Zero;
-    blendComponent.operation = wgpu::BlendOperation::Add;
-
-    wgpu::BlendState blendState = {};
-    blendState.alpha = blendComponent;
-    blendState.color = blendComponent;
-
-    wgpu::RenderPipeline renderPipeline =
-        context.device.CreateRenderPipeline(&renderPipelineDescriptor);
+    bool show_demo_window = true;
+    bool show_another_window = false;
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     int running = 1;
     while (running) {
         bool success = pollEvent(running, windowData);
         context.instance.ProcessEvents();
 
-        if (!c2::isSameConfig(windowData.currentConfig,
-                              windowData.targetConfig)) {
-            C2Core::Log::info("Window Resized. New Size: %dx%d",
-                              windowData.targetConfig.width,
-                              windowData.targetConfig.height);
-            windowData.surface.Configure(&windowData.targetConfig);
-            windowData.currentConfig = windowData.targetConfig;
+        ImGui_ImplWGPU_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+
+        ImGuiDockNodeFlags dockspace_flags =
+            ImGuiDockNodeFlags_PassthruCentralNode;
+        ImGui::DockSpaceOverViewport(0, nullptr, dockspace_flags);
+
+        if (show_demo_window) {
+            ImGui::ShowDemoWindow(&show_demo_window);
         }
+
+        ImGui::Render();
 
         wgpu::SurfaceTexture surfaceTexture = {};
         windowData.surface.GetCurrentTexture(&surfaceTexture);
@@ -145,7 +143,7 @@ int main(int argc, char** argv) {
         colorAttachment.view = view;
         colorAttachment.loadOp = wgpu::LoadOp::Clear;
         colorAttachment.storeOp = wgpu::StoreOp::Store;
-        colorAttachment.clearValue = wgpu::Color{0.0, 0.0, 0.0, 1.0};
+        colorAttachment.clearValue = wgpu::Color{0.0, 0.0, 1.0, 1.0};
 
         renderPassDescriptor.colorAttachmentCount = 1;
         renderPassDescriptor.colorAttachments = &colorAttachment;
@@ -154,8 +152,7 @@ int main(int argc, char** argv) {
 
         wgpu::RenderPassEncoder pass =
             encoder.BeginRenderPass(&renderPassDescriptor);
-        pass.SetPipeline(renderPipeline);
-        pass.Draw(3);
+        ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), pass.Get());
         pass.End();
 
         wgpu::CommandBuffer commands = encoder.Finish();
@@ -165,6 +162,11 @@ int main(int argc, char** argv) {
         if (presentStatus != wgpu::Status::Success) {
             C2Core::Log::error("Present status failed");
             return EXIT_FAILURE;
+        }
+
+        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+            ImGui::UpdatePlatformWindows();
+            ImGui::RenderPlatformWindowsDefault();
         }
     }
 
@@ -180,6 +182,13 @@ int main(int argc, char** argv) {
     std::cout << "DeviceID: " << std::hex << info.deviceID << std::dec << "\n";
     std::cout << "Name: " << info.device << "\n";
     std::cout << "Driver description: " << info.description << "\n";
+    std::cout << power_props.powerPreference << '\n';
+
+    ImGui_ImplWGPU_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+
+    ma_engine_uninit(&engine);
 
     SDL_DestroyWindow(windowData.window);
     SDL_Quit();

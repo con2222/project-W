@@ -2,6 +2,7 @@
 
 #include <C2Core/c2_log.hpp>
 #include <cassert>
+#include <hardcode.hpp>
 #include <webgpu_context.hpp>
 #include <window.hpp>
 
@@ -15,9 +16,10 @@ void syncFromWindow(WindowData& data) {
     data.targetConfig.height = std::max(1u, static_cast<uint32_t>(height));
 }
 
-WindowData createWindow(GPUContext ctx) {
+WindowData createWindow(gpu::GPUContext ctx) {
     SDL_Window* window =
-        SDL_CreateWindow("Main", 1920, 1080, SDL_WINDOW_RESIZABLE);
+        SDL_CreateWindow("Main", c2::hard::WINDOW_HEIGHT,
+                         c2::hard::WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
 
     wgpu::Surface surface = SDL_GetWGPUSurface(ctx.instance.Get(), window);
     C2Core::Log::info("surface = %p", reinterpret_cast<void*>(surface.Get()));

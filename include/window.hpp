@@ -5,7 +5,7 @@
 
 namespace c2 {
 
-struct GPUContext;
+struct gpu::GPUContext;
 
 struct WindowData {
     SDL_Window* window = nullptr;
@@ -19,7 +19,7 @@ struct WindowData {
     wgpu::SurfaceConfiguration targetConfig;
 };
 
-WindowData createWindow(GPUContext ctx);
+WindowData createWindow(gpu::GPUContext ctx);
 void syncFromWindow(WindowData& data);
 bool isSameConfig(const wgpu::SurfaceConfiguration& a,
                   const wgpu::SurfaceConfiguration& b);
