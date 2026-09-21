@@ -7,6 +7,7 @@
 #include <webgpu/webgpu_cpp_print.h>
 
 #include <C2Core/c2_log.hpp>
+#include <audio.hpp>
 #include <hardcode.hpp>
 #include <webgpu_context.hpp>
 #include <webgpu_utils.hpp>
@@ -96,16 +97,63 @@ void initImGui(c2::gpu::GPUContext& ctx, c2::WindowData data) {
 }
 
 int main(int argc, char** argv) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == false) {
+        C2Core::Log::error("SDL init error: %s", SDL_GetError());
+        return EXIT_FAILURE;
+    };
     c2::gpu::GPUContext context = c2::gpu::getGPUContext();
     c2::WindowData windowData = c2::createWindow(context);
-    setup(context, windowData);
+    initImGui(context, windowData);
+
     ImGuiIO& io = ImGui::GetIO();
 
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    c2::audio::AudioState audioEngine;
+    if (c2::audio::initAudio(audioEngine) != MA_SUCCESS) {
+        C2Core::Log::error("Failed initialize audio engine");
+        delete audioEngine.engine;
+        return EXIT_FAILURE;
+    }
+
+    if (c2::audio::initSoundFromFile(audioEngine, "1.mp3") != MA_SUCCESS) {
+        C2Core::Log::error("Can't init sound");
+        ma_engine_uninit(audioEngine.engine);
+        delete audioEngine.engine;
+        return EXIT_FAILURE;
+    }
+
     int running = 1;
+    float soundVolume = 1.0f;
+    c2::audio::soundSetVolume(audioEngine, soundVolume);
+    ma_uint64 soundLength;
+    ma_uint64 currentSoundLength;
+    c2::audio::AudioFormatInfo audioData;
+
+    if (c2::audio::getLengthPCMFrames(audioEngine, soundLength) != MA_SUCCESS) {
+        C2Core::Log::error("Can't get pcmf length");
+        c2::audio::shutdownAudio(audioEngine);
+        return EXIT_FAILURE;
+    }
+    if (c2::audio::getCursorPCMFrames(audioEngine, currentSoundLength) !=
+        MA_SUCCESS) {
+        C2Core::Log::error("Can't get cursor pcmf");
+        c2::audio::shutdownAudio(audioEngine);
+        return EXIT_FAILURE;
+    }
+    if (c2::audio::getSoundData(audioEngine, audioData) != MA_SUCCESS) {
+        C2Core::Log::error("Can't get sound data");
+        c2::audio::shutdownAudio(audioEngine);
+        return EXIT_FAILURE;
+    }
+
+    float progress_value;
+    uint32_t currentLengthSeconds = currentSoundLength / audioData.pSampleRate;
+    uint32_t soundLengthSeconds = soundLength / audioData.pSampleRate;
+    char overlay[32];
+
     while (running) {
         bool success = pollEvent(running, windowData);
         context.instance.ProcessEvents();
@@ -121,6 +169,53 @@ int main(int argc, char** argv) {
         if (show_demo_window) {
             ImGui::ShowDemoWindow(&show_demo_window);
         }
+
+        ImGui::Begin("Player");
+
+        bool isPlaying = ma_sound_is_playing(&audioEngine.sound);
+        bool atEnd = ma_sound_at_end(&audioEngine.sound);
+
+        if (ImGui::Button(isPlaying ? "Pause" : atEnd ? "Replay" : "Play")) {
+            if (isPlaying) {
+                if (c2::audio::pauseSound(audioEngine) != MA_SUCCESS) {
+                    C2Core::Log::error("Can't stop sound");
+                    break;
+                }
+            } else {
+                if (c2::audio::playSound(audioEngine) != MA_SUCCESS) {
+                    C2Core::Log::error("Can't play sound");
+                    break;
+                }
+            }
+        }
+
+        uint64_t minTime = 0;
+        uint64_t maxTime = soundLength;
+
+        c2::audio::getCursorPCMFrames(audioEngine, currentSoundLength);
+        if (ImGui::SliderScalar("Sound time", ImGuiDataType_U64,
+                                &currentSoundLength, &minTime, &maxTime, "%llu",
+                                ImGuiSliderFlags_AlwaysClamp)) {
+            c2::audio::soundSeekToPCMFrame(audioEngine, currentSoundLength);
+        }
+
+        progress_value = float(currentSoundLength) / soundLength;
+        currentLengthSeconds = currentSoundLength / audioData.pSampleRate;
+        sprintf_s(overlay, "%02u:%02u / %02u:%02u",
+                  static_cast<unsigned>(currentLengthSeconds / 60),
+                  static_cast<unsigned>(currentLengthSeconds % 60),
+                  static_cast<unsigned>(soundLengthSeconds / 60),
+                  static_cast<unsigned>(soundLengthSeconds % 60));
+
+        ImGui::ProgressBar(progress_value, ImVec2(0.f, 0.f), overlay);
+
+        ImGui::Spacing();
+        if (ImGui::SliderFloat("Sound Volume", &soundVolume, 0.f, 1.f, "%.2f",
+                               ImGuiSliderFlags_AlwaysClamp)) {
+            c2::audio::soundSetVolume(audioEngine, soundVolume);
+        }
+
+        ImGui::End();
 
         ImGui::Render();
 
@@ -151,7 +246,7 @@ int main(int argc, char** argv) {
         wgpu::Status presentStatus = windowData.surface.Present();
         if (presentStatus != wgpu::Status::Success) {
             C2Core::Log::error("Present status failed");
-            return EXIT_FAILURE;
+            break;  // TODO: handling error
         }
 
         if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
@@ -177,6 +272,8 @@ int main(int argc, char** argv) {
     ImGui_ImplWGPU_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+
+    c2::audio::shutdownAudio(audioEngine);
 
     SDL_DestroyWindow(windowData.window);
     SDL_Quit();
