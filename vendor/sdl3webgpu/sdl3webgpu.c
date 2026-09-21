@@ -140,34 +140,37 @@ WGPUSurface SDL_GetWGPUSurface(WGPUInstance instance, SDL_Window* window) {
     }
 #endif  // defined(SDL_VIDEO_DRIVER_X11)
 #if defined(SDL_VIDEO_DRIVER_WAYLAND)
-    else if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
+    if (SDL_strcmp(SDL_GetCurrentVideoDriver(), "wayland") == 0) {
         struct wl_display* wayland_display =
             (struct wl_display*)SDL_GetPointerProperty(
                 props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, NULL);
+
         struct wl_surface* wayland_surface =
             (struct wl_surface*)SDL_GetPointerProperty(
                 props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, NULL);
+
         if (!wayland_display || !wayland_surface) return NULL;
 
 #ifdef WEBGPU_BACKEND_DAWN
-        WGPUSurfaceSourceWaylandSurface fromWaylandSurface;
+        WGPUSurfaceSourceWaylandSurface fromWaylandSurface = {0};
         fromWaylandSurface.chain.sType = WGPUSType_SurfaceSourceWaylandSurface;
 #else
-        WGPUSurfaceDescriptorFromWaylandSurface fromWaylandSurface;
+        WGPUSurfaceDescriptorFromWaylandSurface fromWaylandSurface = {0};
         fromWaylandSurface.chain.sType =
             WGPUSType_SurfaceDescriptorFromWaylandSurface;
 #endif
+
         fromWaylandSurface.chain.next = NULL;
         fromWaylandSurface.display = wayland_display;
         fromWaylandSurface.surface = wayland_surface;
 
-        WGPUSurfaceDescriptor surfaceDescriptor;
+        WGPUSurfaceDescriptor surfaceDescriptor = {0};
         surfaceDescriptor.nextInChain = &fromWaylandSurface.chain;
-        surfaceDescriptor.label = NULL;
+        surfaceDescriptor.label = (WGPUStringView){NULL, 0};
 
         return wgpuInstanceCreateSurface(instance, &surfaceDescriptor);
     }
-#endif  // defined(SDL_VIDEO_DRIVER_WAYLAND)
+#endif
 #elif defined(SDL_PLATFORM_WIN32)
     {
         HWND hwnd = (HWND)SDL_GetPointerProperty(

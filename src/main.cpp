@@ -101,16 +101,6 @@ int main(int argc, char** argv) {
     setup(context, windowData);
     ImGuiIO& io = ImGui::GetIO();
 
-    ma_result result;
-    ma_engine engine;
-
-    result = ma_engine_init(NULL, &engine);
-    if (result != MA_SUCCESS) {
-        return -1;
-    }
-
-    ma_engine_play_sound(&engine, "Suffocation-Crystal-Castles.mp3", NULL);
-
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -187,8 +177,6 @@ int main(int argc, char** argv) {
     ImGui_ImplWGPU_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
-
-    ma_engine_uninit(&engine);
 
     SDL_DestroyWindow(windowData.window);
     SDL_Quit();

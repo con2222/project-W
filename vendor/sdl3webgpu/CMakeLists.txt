@@ -17,3 +17,13 @@ if (APPLE)
         target_link_libraries(sdl3webgpu PRIVATE "-framework Cocoa")
     endif()
 endif()
+
+if (UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+    if (USE_X11)
+        target_compile_definitions(sdl3webgpu PRIVATE SDL_VIDEO_DRIVER_X11)
+    endif()
+    
+    if (USE_WAYLAND)
+        target_compile_definitions(sdl3webgpu PRIVATE SDL_VIDEO_DRIVER_WAYLAND)
+    endif()
+endif()

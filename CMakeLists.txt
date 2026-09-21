@@ -14,6 +14,9 @@ set(SDL_SHARED ON CACHE BOOL "Build static SDL library instead of shared" FORCE)
 set(SDL_STATIC OFF CACHE BOOL "Build static SDL" FORCE)
 set(PROJECT_NAME audio-player)
 
+option(USE_WAYLAND "Build with Wayland support" OFF)
+option(USE_X11 "Build with X11 support" OFF)
+
 FetchContent_Declare(
     SDL3
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git

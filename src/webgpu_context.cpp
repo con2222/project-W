@@ -30,7 +30,6 @@ wgpu::Instance initInstance() {
 wgpu::Adapter createAdapter(const wgpu::Instance& instance) {
     // Request adapter
     wgpu::RequestAdapterOptions options = {};
-    options.backendType = wgpu::BackendType::D3D12;
     wgpu::Adapter adapter;
     auto adapterCallback = [](wgpu::RequestAdapterStatus status,
                               wgpu::Adapter adapter, wgpu::StringView message,
