@@ -9,7 +9,8 @@
 // Dear ImGui 1.91.1+ (docking).
 // Вызывать внутри своего кадра, после DockSpaceOverViewport().
 // Здесь только интерфейс и демонстрационное состояние, без аудиодвижка.
-inline void DrawMusicPlayerUI(ImGuiID dockspaceId = 0) {
+inline void DrawMusicPlayerUI(wgpu::TextureView& imageView,
+                              ImGuiID dockspaceId = 0) {
     struct Track {
         const char* title;
         const char* artist;
@@ -85,7 +86,8 @@ inline void DrawMusicPlayerUI(ImGuiID dockspaceId = 0) {
             ImGui::TextUnformatted("LIBRARY");
             ImGui::TextDisabled("%d tracks", trackCount);
             search.Draw("##search", -FLT_MIN);
-            if (ImGui::IsItemHovered())
+            if (ImGui::IsItemHovered())  // Проверяет последний добавленный
+                                         // элемент, то есть searct.draw()
                 ImGui::SetTooltip("Filter by title or artist");
             ImGui::Separator();
 
@@ -125,8 +127,12 @@ inline void DrawMusicPlayerUI(ImGuiID dockspaceId = 0) {
             const ImVec2 available = ImGui::GetContentRegionAvail();
             const ImVec2 size((std::max)(1.0f, available.x),
                               (std::max)(1.0f, available.y));
-            ImGui::Dummy(size);  // Резервируем место для собственной отрисовки.
+            // ImGui::Dummy(size);  // Резервируем место для собственной
+            // отрисовки.
 
+            ImGui::Image((ImTextureID)(intptr_t)imageView.Get(), size);
+
+            /*
             ImDrawList* draw = ImGui::GetWindowDrawList();
             draw->AddRectFilled(p, ImVec2(p.x + size.x, p.y + size.y),
                                 IM_COL32(21, 22, 31, 255), 8.0f);
@@ -155,6 +161,7 @@ inline void DrawMusicPlayerUI(ImGuiID dockspaceId = 0) {
                                     ImVec2(x + step * 0.6f, baseY),
                                     IM_COL32(175, 139, 237, 255), 2.0f);
             }
+            */
         }
         ImGui::EndChild();
 

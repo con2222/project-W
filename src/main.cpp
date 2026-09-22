@@ -97,6 +97,15 @@ void initImGui(c2::gpu::GPUContext& ctx, c2::WindowData data) {
     ImGui_ImplWGPU_Init(&init_info);
 }
 
+wgpu::ShaderModule createShaderModule(const wgpu::Device& device,
+                                      const char* source) {
+    wgpu::ShaderSourceWGSL wgslDesc;
+    wgslDesc.code = source;
+    wgpu::ShaderModuleDescriptor descriptor;
+    descriptor.nextInChain = &wgslDesc;
+    return device.CreateShaderModule(&descriptor);
+}
+
 int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == false) {
         C2Core::Log::error("SDL init error: %s", SDL_GetError());
@@ -111,6 +120,62 @@ int main(int argc, char** argv) {
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
+    // ============================================================================
+    // Texture settup
+    // ============================================================================
+
+    wgpu::ShaderModule shaderModule =
+        createShaderModule(context.device, c2::hard::shader);
+
+    wgpu::TextureDescriptor imageTextureDesc = {};
+    imageTextureDesc.dimension = wgpu::TextureDimension::e2D;
+    imageTextureDesc.size = {windowData.targetConfig.width,
+                             windowData.targetConfig.height};
+    imageTextureDesc.usage = wgpu::TextureUsage::RenderAttachment |
+                             wgpu::TextureUsage::TextureBinding;
+    imageTextureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+
+    wgpu::Texture imageTexture =
+        context.device.CreateTexture(&imageTextureDesc);
+    wgpu::TextureView imageView = imageTexture.CreateView();
+
+    // --- Render pipeline setup ---
+
+    wgpu::RenderPipelineDescriptor scenePipelineDesc = {};
+    scenePipelineDesc.depthStencil = nullptr;
+
+    scenePipelineDesc.vertex.buffers = nullptr;
+    scenePipelineDesc.vertex.bufferCount = 0;
+    scenePipelineDesc.vertex.module = shaderModule;
+    scenePipelineDesc.vertex.entryPoint = "scene_vs";
+
+    scenePipelineDesc.primitive.topology =
+        wgpu::PrimitiveTopology::TriangleList;
+    scenePipelineDesc.primitive.cullMode = wgpu::CullMode::None;
+    scenePipelineDesc.primitive.stripIndexFormat = wgpu::IndexFormat::Undefined;
+
+    scenePipelineDesc.primitive.frontFace = wgpu::FrontFace::CCW;
+    scenePipelineDesc.depthStencil = nullptr;
+    scenePipelineDesc.multisample.count = 1;
+    scenePipelineDesc.multisample.mask = 0xFFFFFFFF;
+    scenePipelineDesc.multisample.alphaToCoverageEnabled = false;
+
+    wgpu::FragmentState sceneFragmentState = {};
+    sceneFragmentState.module = shaderModule;
+    sceneFragmentState.entryPoint = "scene_fs";
+    sceneFragmentState.targetCount = 1;
+    wgpu::ColorTargetState sceneColorTarget = {};
+    sceneColorTarget.format = wgpu::TextureFormat::RGBA8Unorm;
+    sceneFragmentState.targets = &sceneColorTarget;
+    scenePipelineDesc.fragment = &sceneFragmentState;
+
+    wgpu::RenderPipeline scenePipeline =
+        context.device.CreateRenderPipeline(&scenePipelineDesc);
+
+    // ============================================================================
+    // Audio settings
+    // ============================================================================
 
     c2::audio::AudioState audioEngine;
     if (c2::audio::initAudio(audioEngine) != MA_SUCCESS) {
@@ -168,10 +233,8 @@ int main(int argc, char** argv) {
         const ImGuiID dockspaceID =
             ImGui::DockSpaceOverViewport(0, nullptr, dockspace_flags);
 
-        DrawMusicPlayerUI(dockspaceID);
-
         if (show_demo_window) {
-            // ImGui::ShowDemoWindow(&show_demo_window);
+            ImGui::ShowDemoWindow(&show_demo_window);
         }
 
         /*
@@ -223,26 +286,45 @@ int main(int argc, char** argv) {
         ImGui::End();
         */
 
-        ImGui::Render();
-
         wgpu::SurfaceTexture surfaceTexture = {};
         windowData.surface.GetCurrentTexture(&surfaceTexture);
         wgpu::TextureView view = surfaceTexture.texture.CreateView();
 
+        // --- For texture rendering ---
+        wgpu::RenderPassDescriptor scenePassDesc = {};
+        wgpu::RenderPassColorAttachment sceneColorAttachment = {};
+        sceneColorAttachment.view = imageView;
+        sceneColorAttachment.loadOp = wgpu::LoadOp::Clear;
+        sceneColorAttachment.storeOp = wgpu::StoreOp::Store;
+        sceneColorAttachment.clearValue = wgpu::Color{0.0, 0.0, 0.0, 1.0};
+        scenePassDesc.colorAttachmentCount = 1;
+        scenePassDesc.colorAttachments = &sceneColorAttachment;
+
+        // --- For window rendering ---
         wgpu::RenderPassDescriptor renderPassDescriptor = {};
         wgpu::RenderPassColorAttachment colorAttachment = {};
         colorAttachment.view = view;
         colorAttachment.loadOp = wgpu::LoadOp::Clear;
         colorAttachment.storeOp = wgpu::StoreOp::Store;
         colorAttachment.clearValue = wgpu::Color{0.0, 0.0, 1.0, 1.0};
-
         renderPassDescriptor.colorAttachmentCount = 1;
         renderPassDescriptor.colorAttachments = &colorAttachment;
 
         wgpu::CommandEncoder encoder = context.device.CreateCommandEncoder();
 
+        wgpu::RenderPassEncoder scenePass =
+            encoder.BeginRenderPass(&scenePassDesc);
+
+        scenePass.SetPipeline(scenePipeline);
+        scenePass.Draw(3);
+        scenePass.End();
+
+        DrawMusicPlayerUI(imageView, dockspaceID);
+        ImGui::Render();
+
         wgpu::RenderPassEncoder pass =
             encoder.BeginRenderPass(&renderPassDescriptor);
+
         ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), pass.Get());
         pass.End();
 
@@ -260,20 +342,6 @@ int main(int argc, char** argv) {
             ImGui::RenderPlatformWindowsDefault();
         }
     }
-
-    wgpu::DawnAdapterPropertiesPowerPreference power_props{};
-
-    wgpu::AdapterInfo info{};
-    info.nextInChain = &power_props;
-
-    context.adapter.GetInfo(&info);
-    std::cout << "VendorID: " << std::hex << info.vendorID << std::dec << "\n";
-    std::cout << "Vendor: " << info.vendor << "\n";
-    std::cout << "Architecture: " << info.architecture << "\n";
-    std::cout << "DeviceID: " << std::hex << info.deviceID << std::dec << "\n";
-    std::cout << "Name: " << info.device << "\n";
-    std::cout << "Driver description: " << info.description << "\n";
-    std::cout << power_props.powerPreference << '\n';
 
     ImGui_ImplWGPU_Shutdown();
     ImGui_ImplSDL3_Shutdown();

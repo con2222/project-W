@@ -21,4 +21,57 @@ constexpr const char* SHADER_TRIANGLE = R"(
 constexpr int WINDOW_WIDTH = 1920;
 constexpr int WINDOW_HEIGHT = 1080;
 
+inline const char* shader = R"(
+
+struct SceneVSOutput {
+    @builtin(position) position : vec4f,
+};
+
+// ---------------------------------------------------------
+// Scene pass
+//
+// A fullscreen triangle is generated directly from vertex_index.
+// No vertex buffer is needed.
+//
+// The triangle is intentionally larger than the viewport,
+// so after clipping it covers the entire render target.
+// ---------------------------------------------------------
+@vertex
+fn scene_vs(@builtin(vertex_index) idx: u32) -> SceneVSOutput {
+    var positions = array<vec2f, 3>(
+        vec2f(-1.0, -1.0),
+        vec2f( 3.0, -1.0),
+        vec2f(-1.0,  3.0)
+    );
+
+    var out: SceneVSOutput;
+    out.position = vec4f(positions[idx], 0.0, 1.0);
+    return out;
+}
+
+// Generate a procedural color for every fragment.
+//
+// @builtin(position) in a fragment shader contains the
+// fragment position in framebuffer coordinates.
+//
+// Dividing by the render target resolution converts
+// pixel coordinates into normalized coordinates [0, 1].
+@fragment
+fn scene_fs(
+    @builtin(position) fragCoord: vec4f
+) -> @location(0) vec4f {
+
+    let resolution = vec2f(800.0, 600.0);
+
+    let uv = fragCoord.xy / resolution;
+
+    return vec4f(
+        uv.x,
+        uv.y,
+        0.0f,
+        1.0
+    );
+}
+)";
+
 }  // namespace c2::hard
