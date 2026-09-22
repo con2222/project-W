@@ -29,5 +29,6 @@ struct PlayerState {
 bool selectTrack(PlayerState& player, int index);
 void updatePlayerViewData(PlayerState& player, PlayerViewData& viewData);
 std::vector<Track> scanDirectory(const std::string& directoryPath);
+void printAudioMetadata(const std::string& filePath);
 
 }  // namespace c2::audio

@@ -172,9 +172,16 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         float position = current.positionSeconds;
         ImGui::BeginDisabled(!player.audio.hasSound);
         ImGui::SetNextItemWidth(-FLT_MIN);
-        if (ImGui::SliderFloat("##position", &position, 0.0f,
-                               current.durationSeconds, "",
-                               ImGuiSliderFlags_AlwaysClamp)) {
+
+        bool currentDurationChanged = ImGui::SliderFloat(
+            "##position", &position, 0.0f, current.durationSeconds, "",
+            ImGuiSliderFlags_AlwaysClamp);
+
+        if (ImGui::IsItemActive()) {
+            c2::audio::pauseSound(player.audio);
+        }
+
+        if (currentDurationChanged) {
             const double target = static_cast<double>(position) *
                                   player.soundAudioFormat.pSampleRate;
             const auto frame = static_cast<ma_uint64>(std::clamp(
@@ -186,6 +193,11 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
             }
             c2::audio::updatePlayerViewData(player, current);
         }
+
+        if (ImGui::IsItemDeactivated()) {
+            c2::audio::playSound(player.audio);
+        }
+
         ImGui::EndDisabled();
         const int seconds = static_cast<int>(current.positionSeconds);
         const int duration = static_cast<int>(current.durationSeconds);

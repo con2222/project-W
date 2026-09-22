@@ -65,6 +65,9 @@ fn scene_fs(
 
     let uv = fragCoord.xy / resolution;
 
+    
+
+
     return vec4f(
         uv.x,
         uv.y,
@@ -72,6 +75,7 @@ fn scene_fs(
         1.0
     );
 }
+    
 )";
 
 }  // namespace c2::hard

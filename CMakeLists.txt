@@ -38,6 +38,9 @@ target_compile_definitions(sdl3webgpu PRIVATE WEBGPU_BACKEND_DAWN)
 add_subdirectory(vendor/imgui)
 target_compile_definitions(imgui PRIVATE IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
 
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+add_subdirectory(vendor/taglib)
+
 set(SOURCES 
     src/main.cpp
     src/webgpu_context.cpp
@@ -55,12 +58,17 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME}
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib
+        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib/toolkit
+        ${CMAKE_CURRENT_BINARY_DIR}/vendor/taglib/taglib
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui)
+target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui tag)
+
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
     $<TARGET_FILE:SDL3::SDL3>
     $<TARGET_FILE_DIR:${PROJECT_NAME}>
 )
+

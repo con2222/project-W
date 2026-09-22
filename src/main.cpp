@@ -183,9 +183,8 @@ int main(int argc, char** argv) {
     // Add your actual file paths here. Duration is filled after loading a
     // track.
 
-    player.playlist.tracks = c2::audio::scanDirectory("music");
-
-    C2Core::Log::info("%d", player.playlist.tracks.size());
+    player.playlist.tracks = c2::audio::scanDirectory(
+        "music");  // TODO: Change config from .toml or .json
 
     if (c2::audio::initAudio(player.audio) != MA_SUCCESS) {
         C2Core::Log::error("Failed initialize audio engine");
@@ -202,7 +201,7 @@ int main(int argc, char** argv) {
     }
 
     C2Core::Time::Context* timeCtx = C2Core::Time::create(60, 60);
-    double targetFPS = 60;
+    double targetFPS = 120;
 
     int running = 1;
     c2::audio::PlayerViewData viewData{};
@@ -261,8 +260,6 @@ int main(int argc, char** argv) {
         scenePass.Draw(3);
         scenePass.End();
 
-        C2Core::Log::info("%f", ImGui::GetIO().Framerate);
-
         DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
         ImGui::Render();
 
@@ -286,7 +283,7 @@ int main(int argc, char** argv) {
             ImGui::RenderPlatformWindowsDefault();
         }
 
-        C2Core::Time::endFrame(timeCtx, C2Core::Time::WaitMode::Spin);
+        C2Core::Time::endFrame(timeCtx, C2Core::Time::WaitMode::Hybrid);
     }
 
     ImGui_ImplWGPU_Shutdown();
