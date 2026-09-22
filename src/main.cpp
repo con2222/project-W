@@ -9,6 +9,7 @@
 #include <C2Core/c2_log.hpp>
 #include <audio.hpp>
 #include <hardcode.hpp>
+#include <music_player_ui.hpp>
 #include <webgpu_context.hpp>
 #include <webgpu_utils.hpp>
 #include <window.hpp>
@@ -164,12 +165,16 @@ int main(int argc, char** argv) {
 
         ImGuiDockNodeFlags dockspace_flags =
             ImGuiDockNodeFlags_PassthruCentralNode;
-        ImGui::DockSpaceOverViewport(0, nullptr, dockspace_flags);
+        const ImGuiID dockspaceID =
+            ImGui::DockSpaceOverViewport(0, nullptr, dockspace_flags);
+
+        DrawMusicPlayerUI(dockspaceID);
 
         if (show_demo_window) {
-            ImGui::ShowDemoWindow(&show_demo_window);
+            // ImGui::ShowDemoWindow(&show_demo_window);
         }
 
+        /*
         ImGui::Begin("Player");
 
         bool isPlaying = ma_sound_is_playing(&audioEngine.sound);
@@ -201,11 +206,11 @@ int main(int argc, char** argv) {
 
         progress_value = float(currentSoundLength) / soundLength;
         currentLengthSeconds = currentSoundLength / audioData.pSampleRate;
-        sprintf_s(overlay, "%02u:%02u / %02u:%02u",
-                  static_cast<unsigned>(currentLengthSeconds / 60),
-                  static_cast<unsigned>(currentLengthSeconds % 60),
-                  static_cast<unsigned>(soundLengthSeconds / 60),
-                  static_cast<unsigned>(soundLengthSeconds % 60));
+        sprintf(overlay, "%02u:%02u / %02u:%02u",
+                static_cast<unsigned>(currentLengthSeconds / 60),
+                static_cast<unsigned>(currentLengthSeconds % 60),
+                static_cast<unsigned>(soundLengthSeconds / 60),
+                static_cast<unsigned>(soundLengthSeconds % 60));
 
         ImGui::ProgressBar(progress_value, ImVec2(0.f, 0.f), overlay);
 
@@ -216,6 +221,7 @@ int main(int argc, char** argv) {
         }
 
         ImGui::End();
+        */
 
         ImGui::Render();
 
