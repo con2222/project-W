@@ -33,10 +33,6 @@ ma_result pauseSound(AudioState& audio) {
     return result;
 }
 
-void soundSetVolume(AudioState& audio, float volumeValue) {
-    ma_sound_set_volume(&audio.sound, volumeValue);
-}
-
 ma_result getLengthPCMFrames(AudioState& audio, ma_uint64& outValue) {
     return ma_sound_get_length_in_pcm_frames(&audio.sound, &outValue);
 }
@@ -55,5 +51,19 @@ ma_result soundSeekToPCMFrame(AudioState& audio, ma_uint64 frameIndex) {
 }
 
 void uninitSound(AudioState& audio) { ma_sound_uninit(&audio.sound); }
+
+bool isSoundPlaying(AudioState& audio) {
+    return ma_sound_is_playing(&audio.sound);
+}
+
+bool isSoundAtEnd(AudioState& audio) { return ma_sound_at_end(&audio.sound); }
+
+void setSoundVolume(AudioState& audio, float volumeValue) {
+    ma_sound_set_volume(&audio.sound, volumeValue);
+}
+
+float getSoundVolume(AudioState& audio) {
+    return ma_sound_get_volume(&audio.sound);
+}
 
 }  // namespace c2::audio

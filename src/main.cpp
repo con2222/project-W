@@ -215,9 +215,17 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    c2::audio::PlayerViewData viewData = {};
     float progress_value;
     uint32_t currentLengthSeconds = currentSoundLength / audioData.pSampleRate;
     uint32_t soundLengthSeconds = soundLength / audioData.pSampleRate;
+
+    viewData.currentSoundLength = currentSoundLength;
+    viewData.soundCurrentLengthSeconds = currentLengthSeconds;
+    viewData.soundLength = soundLength;
+    viewData.soundLengthSeconds = soundLengthSeconds;
+    viewData.volume = c2::audio::getSoundVolume(audioEngine);
+
     char overlay[32];
 
     while (running) {
@@ -234,8 +242,14 @@ int main(int argc, char** argv) {
             ImGui::DockSpaceOverViewport(0, nullptr, dockspace_flags);
 
         if (show_demo_window) {
-            ImGui::ShowDemoWindow(&show_demo_window);
+            // ImGui::ShowDemoWindow(&show_demo_window);
         }
+
+        viewData.isPlaying = c2::audio::isSoundPlaying(audioEngine);
+        viewData.atEnd = c2::audio::isSoundAtEnd(audioEngine);
+        c2::audio::getCursorPCMFrames(audioEngine, viewData.currentSoundLength);
+        viewData.soundCurrentLengthSeconds =
+            currentSoundLength / audioData.pSampleRate;
 
         /*
         ImGui::Begin("Player");
@@ -319,7 +333,7 @@ int main(int argc, char** argv) {
         scenePass.Draw(3);
         scenePass.End();
 
-        DrawMusicPlayerUI(imageView, dockspaceID);
+        DrawMusicPlayerUI(imageView, viewData, audioEngine, dockspaceID);
         ImGui::Render();
 
         wgpu::RenderPassEncoder pass =

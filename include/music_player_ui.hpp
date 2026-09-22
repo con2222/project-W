@@ -3,6 +3,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <audio.hpp>
 #include <cfloat>
 #include <cmath>
 
@@ -10,6 +11,8 @@
 // Вызывать внутри своего кадра, после DockSpaceOverViewport().
 // Здесь только интерфейс и демонстрационное состояние, без аудиодвижка.
 inline void DrawMusicPlayerUI(wgpu::TextureView& imageView,
+                              const c2::audio::PlayerViewData& viewData,
+                              c2::audio::AudioState& audioEngine,
                               ImGuiID dockspaceId = 0) {
     struct Track {
         const char* title;

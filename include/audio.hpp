@@ -18,6 +18,21 @@ struct AudioFormatInfo {
     ma_channel pChannelMap[MA_MAX_CHANNELS];
 };
 
+struct PlayerViewData {
+    bool isPlaying = false;
+    bool atEnd = true;
+    float volume = 0.75f;
+    uint32_t soundCurrentLengthSeconds = 0;
+    uint32_t soundLengthSeconds = 0;
+    ma_uint64 currentSoundLength = 0;
+    ma_uint64 soundLength = 0;
+};
+
+struct PlayerActions {
+    bool isPlaying;
+    float
+};
+
 ma_result initAudio(AudioState& audio);
 void shutdownAudio(AudioState& audio);
 ma_result initSoundFromFile(AudioState& audio, const std::string& filename);
@@ -27,8 +42,11 @@ ma_result getLengthPCMFrames(AudioState& audio, ma_uint64& outValue);
 ma_result getCursorPCMFrames(AudioState& audio, ma_uint64& outValue);
 ma_result getSoundData(AudioState& audio, AudioFormatInfo& outData);
 ma_result soundSeekToPCMFrame(AudioState& audio, ma_uint64 frameIndex);
+bool isSoundPlaying(AudioState& audio);
+bool isSoundAtEnd(AudioState& audio);
 
-void soundSetVolume(AudioState& audio, float volumeValue);
+void setSoundVolume(AudioState& audio, float volumeValue);
+float getSoundVolume(AudioState& audio);
 
 void uninitSound(AudioState& audio);
 
