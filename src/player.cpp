@@ -1,4 +1,6 @@
 #include <C2Core/c2_log.hpp>
+#include <algorithm>
+#include <cctype>
 #include <player.hpp>
 
 namespace c2::audio {
@@ -66,6 +68,33 @@ void updatePlayerViewData(PlayerState& player, PlayerViewData& viewData) {
         static_cast<float>(viewData.positionFrames / sampleRate);
     viewData.durationSeconds =
         static_cast<float>(viewData.durationFrames / sampleRate);
+}
+
+std::vector<Track> scanDirectory(const std::string& directoryPath) {
+    std::vector<Track> tracks;
+    namespace fs = std::filesystem;
+
+    if (!fs::exists(directoryPath) || !fs::is_directory(directoryPath)) {
+        return tracks;
+    }
+
+    for (const auto& entry : fs::directory_iterator(directoryPath)) {
+        if (entry.is_regular_file()) {
+            std::string ext = entry.path().extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(),
+                           [](unsigned char c) { return std::tolower(c); });
+
+            if (ext == ".mp3" || ext == ".wav" || ext == ".flac") {
+                Track track;
+                track.filepath = entry.path().string();
+                track.title = entry.path().stem().string();
+                track.artist = "";
+                track.duration = 0;
+                tracks.push_back(track);
+            }
+        }
+    }
+    return tracks;
 }
 
 }  // namespace c2::audio

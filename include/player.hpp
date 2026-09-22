@@ -1,5 +1,6 @@
 #pragma once
 #include <audio.hpp>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -27,5 +28,6 @@ struct PlayerState {
 
 bool selectTrack(PlayerState& player, int index);
 void updatePlayerViewData(PlayerState& player, PlayerViewData& viewData);
+std::vector<Track> scanDirectory(const std::string& directoryPath);
 
 }  // namespace c2::audio

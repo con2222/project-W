@@ -183,11 +183,9 @@ int main(int argc, char** argv) {
     // Add your actual file paths here. Duration is filled after loading a
     // track.
 
-    player.playlist.tracks = {
-        {"Suffoation", "daubi", "1.mp3"},
-        {"Kingdom of numbers", "kingdom", "4.mp3"}
-        // {"Another track", "Artist", "path/to/another.mp3", 0},
-    };
+    player.playlist.tracks = c2::audio::scanDirectory("music");
+
+    C2Core::Log::info("%d", player.playlist.tracks.size());
 
     if (c2::audio::initAudio(player.audio) != MA_SUCCESS) {
         C2Core::Log::error("Failed initialize audio engine");
@@ -195,7 +193,12 @@ int main(int argc, char** argv) {
     }
 
     if (!player.playlist.tracks.empty()) {
-        c2::audio::selectTrack(player, 1);
+        if (!c2::audio::selectTrack(player, 0)) {
+            C2Core::Log::error("Failed to select initial track");
+        }
+    } else {
+        C2Core::Log::warning(
+            "Playlist is empty. No tracks found in directory.");
     }
 
     C2Core::Time::Context* timeCtx = C2Core::Time::create(60, 60);
