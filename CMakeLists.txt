@@ -46,6 +46,8 @@ set(SOURCES
     src/webgpu_utils.cpp
     src/render.cpp
     src/audio.cpp
+    src/music_player_ui.cpp
+    src/player.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

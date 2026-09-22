@@ -177,56 +177,28 @@ int main(int argc, char** argv) {
     // Audio settings
     // ============================================================================
 
-    c2::audio::AudioState audioEngine;
-    if (c2::audio::initAudio(audioEngine) != MA_SUCCESS) {
+    c2::audio::PlayerState player{};
+    player.volume = 1.0f;
+    // Add your actual file paths here. Duration is filled after loading a
+    // track.
+
+    player.playlist.tracks = {
+        {"Suffoation", "daubi", "1.mp3"},
+        {"Kingdom of numbers", "kingdom", "4.mp3"}
+        // {"Another track", "Artist", "path/to/another.mp3", 0},
+    };
+
+    if (c2::audio::initAudio(player.audio) != MA_SUCCESS) {
         C2Core::Log::error("Failed initialize audio engine");
-        delete audioEngine.engine;
         return EXIT_FAILURE;
     }
 
-    if (c2::audio::initSoundFromFile(audioEngine, "1.mp3") != MA_SUCCESS) {
-        C2Core::Log::error("Can't init sound");
-        ma_engine_uninit(audioEngine.engine);
-        delete audioEngine.engine;
-        return EXIT_FAILURE;
+    if (!player.playlist.tracks.empty()) {
+        c2::audio::selectTrack(player, 1);
     }
 
     int running = 1;
-    float soundVolume = 1.0f;
-    c2::audio::soundSetVolume(audioEngine, soundVolume);
-    ma_uint64 soundLength;
-    ma_uint64 currentSoundLength;
-    c2::audio::AudioFormatInfo audioData;
-
-    if (c2::audio::getLengthPCMFrames(audioEngine, soundLength) != MA_SUCCESS) {
-        C2Core::Log::error("Can't get pcmf length");
-        c2::audio::shutdownAudio(audioEngine);
-        return EXIT_FAILURE;
-    }
-    if (c2::audio::getCursorPCMFrames(audioEngine, currentSoundLength) !=
-        MA_SUCCESS) {
-        C2Core::Log::error("Can't get cursor pcmf");
-        c2::audio::shutdownAudio(audioEngine);
-        return EXIT_FAILURE;
-    }
-    if (c2::audio::getSoundData(audioEngine, audioData) != MA_SUCCESS) {
-        C2Core::Log::error("Can't get sound data");
-        c2::audio::shutdownAudio(audioEngine);
-        return EXIT_FAILURE;
-    }
-
-    c2::audio::PlayerViewData viewData = {};
-    float progress_value;
-    uint32_t currentLengthSeconds = currentSoundLength / audioData.pSampleRate;
-    uint32_t soundLengthSeconds = soundLength / audioData.pSampleRate;
-
-    viewData.currentSoundLength = currentSoundLength;
-    viewData.soundCurrentLengthSeconds = currentLengthSeconds;
-    viewData.soundLength = soundLength;
-    viewData.soundLengthSeconds = soundLengthSeconds;
-    viewData.volume = c2::audio::getSoundVolume(audioEngine);
-
-    char overlay[32];
+    c2::audio::PlayerViewData viewData{};
 
     while (running) {
         bool success = pollEvent(running, windowData);
@@ -245,60 +217,7 @@ int main(int argc, char** argv) {
             // ImGui::ShowDemoWindow(&show_demo_window);
         }
 
-        viewData.isPlaying = c2::audio::isSoundPlaying(audioEngine);
-        viewData.atEnd = c2::audio::isSoundAtEnd(audioEngine);
-        c2::audio::getCursorPCMFrames(audioEngine, viewData.currentSoundLength);
-        viewData.soundCurrentLengthSeconds =
-            currentSoundLength / audioData.pSampleRate;
-
-        /*
-        ImGui::Begin("Player");
-
-        bool isPlaying = ma_sound_is_playing(&audioEngine.sound);
-        bool atEnd = ma_sound_at_end(&audioEngine.sound);
-
-        if (ImGui::Button(isPlaying ? "Pause" : atEnd ? "Replay" : "Play")) {
-            if (isPlaying) {
-                if (c2::audio::pauseSound(audioEngine) != MA_SUCCESS) {
-                    C2Core::Log::error("Can't stop sound");
-                    break;
-                }
-            } else {
-                if (c2::audio::playSound(audioEngine) != MA_SUCCESS) {
-                    C2Core::Log::error("Can't play sound");
-                    break;
-                }
-            }
-        }
-
-        uint64_t minTime = 0;
-        uint64_t maxTime = soundLength;
-
-        c2::audio::getCursorPCMFrames(audioEngine, currentSoundLength);
-        if (ImGui::SliderScalar("Sound time", ImGuiDataType_U64,
-                                &currentSoundLength, &minTime, &maxTime, "%llu",
-                                ImGuiSliderFlags_AlwaysClamp)) {
-            c2::audio::soundSeekToPCMFrame(audioEngine, currentSoundLength);
-        }
-
-        progress_value = float(currentSoundLength) / soundLength;
-        currentLengthSeconds = currentSoundLength / audioData.pSampleRate;
-        sprintf(overlay, "%02u:%02u / %02u:%02u",
-                static_cast<unsigned>(currentLengthSeconds / 60),
-                static_cast<unsigned>(currentLengthSeconds % 60),
-                static_cast<unsigned>(soundLengthSeconds / 60),
-                static_cast<unsigned>(soundLengthSeconds % 60));
-
-        ImGui::ProgressBar(progress_value, ImVec2(0.f, 0.f), overlay);
-
-        ImGui::Spacing();
-        if (ImGui::SliderFloat("Sound Volume", &soundVolume, 0.f, 1.f, "%.2f",
-                               ImGuiSliderFlags_AlwaysClamp)) {
-            c2::audio::soundSetVolume(audioEngine, soundVolume);
-        }
-
-        ImGui::End();
-        */
+        c2::audio::updatePlayerViewData(player, viewData);
 
         wgpu::SurfaceTexture surfaceTexture = {};
         windowData.surface.GetCurrentTexture(&surfaceTexture);
@@ -333,7 +252,7 @@ int main(int argc, char** argv) {
         scenePass.Draw(3);
         scenePass.End();
 
-        DrawMusicPlayerUI(imageView, viewData, audioEngine, dockspaceID);
+        DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
         ImGui::Render();
 
         wgpu::RenderPassEncoder pass =
@@ -361,7 +280,7 @@ int main(int argc, char** argv) {
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
 
-    c2::audio::shutdownAudio(audioEngine);
+    c2::audio::shutdownAudio(player.audio);
 
     SDL_DestroyWindow(windowData.window);
     SDL_Quit();
