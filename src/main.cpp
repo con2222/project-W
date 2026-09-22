@@ -7,6 +7,7 @@
 #include <webgpu/webgpu_cpp_print.h>
 
 #include <C2Core/c2_log.hpp>
+#include <C2Core/time_core.hpp>
 #include <audio.hpp>
 #include <hardcode.hpp>
 #include <music_player_ui.hpp>
@@ -197,10 +198,15 @@ int main(int argc, char** argv) {
         c2::audio::selectTrack(player, 1);
     }
 
+    C2Core::Time::Context* timeCtx = C2Core::Time::create(60, 60);
+    double targetFPS = 60;
+
     int running = 1;
     c2::audio::PlayerViewData viewData{};
 
     while (running) {
+        C2Core::Time::startFrame(timeCtx);
+        C2Core::Time::setTargetFPS(timeCtx, targetFPS);
         bool success = pollEvent(running, windowData);
         context.instance.ProcessEvents();
 
@@ -252,6 +258,8 @@ int main(int argc, char** argv) {
         scenePass.Draw(3);
         scenePass.End();
 
+        C2Core::Log::info("%f", ImGui::GetIO().Framerate);
+
         DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
         ImGui::Render();
 
@@ -274,6 +282,8 @@ int main(int argc, char** argv) {
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault();
         }
+
+        C2Core::Time::endFrame(timeCtx, C2Core::Time::WaitMode::Spin);
     }
 
     ImGui_ImplWGPU_Shutdown();

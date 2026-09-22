@@ -24,9 +24,11 @@ void shutdownAudio(AudioState& audio) {
 
 ma_result loadSoundFromFile(AudioState& audio, const std::string& filename) {
     uninitSound(audio);
-    // Stream the selected track instead of keeping the whole encoded file in memory.
-    ma_result result = ma_sound_init_from_file(audio.engine, filename.c_str(), MA_SOUND_FLAG_STREAM,
-                                               nullptr, nullptr, &audio.sound);
+    // Stream the selected track instead of keeping the whole encoded file in
+    // memory.
+    ma_result result = ma_sound_init_from_file(audio.engine, filename.c_str(),
+                                               MA_SOUND_FLAG_STREAM, nullptr,
+                                               nullptr, &audio.sound);
     audio.hasSound = (result == MA_SUCCESS);
     return result;
 }
