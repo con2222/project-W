@@ -60,7 +60,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib/toolkit
-        ${CMAKE_CURRENT_BINARY_DIR}/vendor/taglib/taglib
+        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib
 )
 
 target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui tag)

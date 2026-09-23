@@ -10,6 +10,7 @@
 #include <C2Core/time_core.hpp>
 #include <audio.hpp>
 #include <hardcode.hpp>
+#include <interfacetest.hpp>
 #include <music_player_ui.hpp>
 #include <webgpu_context.hpp>
 #include <webgpu_utils.hpp>
@@ -105,6 +106,67 @@ wgpu::ShaderModule createShaderModule(const wgpu::Device& device,
     wgpu::ShaderModuleDescriptor descriptor;
     descriptor.nextInChain = &wgslDesc;
     return device.CreateShaderModule(&descriptor);
+}
+
+void RenderAnimatedMenu() {
+    // Static variables to keep state between frames
+    static bool is_window_open = false;
+    static float anim_progress = 0.0f;
+
+    // Toggle button for testing
+    if (ImGui::Button("Toggle Animated Window")) {
+        is_window_open = !is_window_open;
+    }
+
+    // 1. Update animation progress based on DeltaTime
+    float delta_time = ImGui::GetIO().DeltaTime;
+    float animation_speed = 3.5f;  // Multiplier for how fast it opens/closes
+
+    if (is_window_open) {
+        anim_progress += delta_time * animation_speed;
+        if (anim_progress > 1.0f) anim_progress = 1.0f;
+    } else {
+        anim_progress -= delta_time * animation_speed;
+        if (anim_progress < 0.0f) anim_progress = 0.0f;
+    }
+
+    // 2. Render window only if it's partially or fully visible
+    if (anim_progress > 0.0f) {
+        // Simple Ease-Out Cubic function for smoother animation
+        // float ease_out = 1.0f - std::pow(1.0f - anim_progress, 3.0f);
+
+        // Calculate sliding position (e.g., sliding down from the top)
+        float start_y = -200.0f;  // Hidden above the screen
+        float target_y = 50.0f;   // Final resting position
+        float current_y = start_y + (target_y - start_y) * anim_progress;
+
+        // Apply animated position
+        ImGui::SetNextWindowPos(ImVec2(100.0f, current_y), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(300.0f, 150.0f), ImGuiCond_Once);
+
+        // Apply animated transparency (fade in/out)
+        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, anim_progress);
+
+        // Begin the window. We disable saving settings so it always uses our
+        // animated position
+        if (ImGui::Begin("Animated Menu", nullptr,
+                         ImGuiWindowFlags_NoSavedSettings |
+                             ImGuiWindowFlags_NoCollapse)) {
+            ImGui::Text("This window slides down and fades in!");
+            ImGui::Separator();
+
+            // Internal window contents
+            ImGui::Text("Animation Progress: %.2f", anim_progress);
+
+            if (ImGui::Button("Close Menu")) {
+                is_window_open = false;
+            }
+        }
+        ImGui::End();
+
+        // Don't forget to pop the style variable!
+        ImGui::PopStyleVar();
+    }
 }
 
 int main(int argc, char** argv) {
@@ -260,7 +322,9 @@ int main(int argc, char** argv) {
         scenePass.Draw(3);
         scenePass.End();
 
-        DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
+        RenderAnimatedMenu();
+
+        // DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
         ImGui::Render();
 
         wgpu::RenderPassEncoder pass =

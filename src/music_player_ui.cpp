@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <music_player_ui.hpp>
 
+#include "audio.hpp"
+
 void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                        const c2::audio::PlayerViewData& viewData,
                        c2::audio::PlayerState& player, ImGuiID dockspaceId) {
@@ -80,6 +82,7 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                 if (ImGui::Selectable(player.playlist.tracks[i].title.c_str(),
                                       player.playlist.currentIndex == i)) {
                     c2::audio::selectTrack(player, i);
+                    c2::audio::playSound(player.audio);
                     c2::audio::updatePlayerViewData(player, current);
                 }
                 const auto& track = player.playlist.tracks[i];
@@ -131,6 +134,7 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                     ? static_cast<int>(player.playlist.tracks.size()) - 1
                     : player.playlist.currentIndex - 1;
             c2::audio::selectTrack(player, index);
+            c2::audio::playSound(player.audio);
             c2::audio::updatePlayerViewData(player, current);
         }
         ImGui::EndDisabled();
@@ -157,6 +161,9 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
             const int index = (player.playlist.currentIndex + 1) %
                               static_cast<int>(player.playlist.tracks.size());
             c2::audio::selectTrack(player, index);
+            if (c2::audio::playSound(player.audio) != MA_SUCCESS) {
+                C2Core::Log::error("Can't set next track");
+            }
             c2::audio::updatePlayerViewData(player, current);
         }
         ImGui::EndDisabled();

@@ -48,11 +48,6 @@ bool selectTrack(PlayerState& player, int index) {
         player.durationFrames / player.soundAudioFormat.pSampleRate);
     setSoundVolume(player.audio, player.volume);
 
-    result = playSound(player.audio);
-    if (result != MA_SUCCESS) {
-        C2Core::Log::error("Can't start sound: %d", result);
-        return false;
-    }
     return true;
 }
 
