@@ -12,6 +12,7 @@
 #include <hardcode.hpp>
 #include <interfacetest.hpp>
 #include <music_player_ui.hpp>
+#include <render.hpp>
 #include <webgpu_context.hpp>
 #include <webgpu_utils.hpp>
 #include <window.hpp>
@@ -108,67 +109,6 @@ wgpu::ShaderModule createShaderModule(const wgpu::Device& device,
     return device.CreateShaderModule(&descriptor);
 }
 
-void RenderAnimatedMenu() {
-    // Static variables to keep state between frames
-    static bool is_window_open = false;
-    static float anim_progress = 0.0f;
-
-    // Toggle button for testing
-    if (ImGui::Button("Toggle Animated Window")) {
-        is_window_open = !is_window_open;
-    }
-
-    // 1. Update animation progress based on DeltaTime
-    float delta_time = ImGui::GetIO().DeltaTime;
-    float animation_speed = 3.5f;  // Multiplier for how fast it opens/closes
-
-    if (is_window_open) {
-        anim_progress += delta_time * animation_speed;
-        if (anim_progress > 1.0f) anim_progress = 1.0f;
-    } else {
-        anim_progress -= delta_time * animation_speed;
-        if (anim_progress < 0.0f) anim_progress = 0.0f;
-    }
-
-    // 2. Render window only if it's partially or fully visible
-    if (anim_progress > 0.0f) {
-        // Simple Ease-Out Cubic function for smoother animation
-        // float ease_out = 1.0f - std::pow(1.0f - anim_progress, 3.0f);
-
-        // Calculate sliding position (e.g., sliding down from the top)
-        float start_y = -200.0f;  // Hidden above the screen
-        float target_y = 50.0f;   // Final resting position
-        float current_y = start_y + (target_y - start_y) * anim_progress;
-
-        // Apply animated position
-        ImGui::SetNextWindowPos(ImVec2(100.0f, current_y), ImGuiCond_Always);
-        ImGui::SetNextWindowSize(ImVec2(300.0f, 150.0f), ImGuiCond_Once);
-
-        // Apply animated transparency (fade in/out)
-        ImGui::PushStyleVar(ImGuiStyleVar_Alpha, anim_progress);
-
-        // Begin the window. We disable saving settings so it always uses our
-        // animated position
-        if (ImGui::Begin("Animated Menu", nullptr,
-                         ImGuiWindowFlags_NoSavedSettings |
-                             ImGuiWindowFlags_NoCollapse)) {
-            ImGui::Text("This window slides down and fades in!");
-            ImGui::Separator();
-
-            // Internal window contents
-            ImGui::Text("Animation Progress: %.2f", anim_progress);
-
-            if (ImGui::Button("Close Menu")) {
-                is_window_open = false;
-            }
-        }
-        ImGui::End();
-
-        // Don't forget to pop the style variable!
-        ImGui::PopStyleVar();
-    }
-}
-
 int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == false) {
         C2Core::Log::error("SDL init error: %s", SDL_GetError());
@@ -184,12 +124,53 @@ int main(int argc, char** argv) {
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
+    wgpu::BufferDescriptor uniformBufferDesc = {};
+    uniformBufferDesc.mappedAtCreation = false;
+    uniformBufferDesc.size = sizeof(c2::render::Uniforms);
+    uniformBufferDesc.usage =
+        wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
+    wgpu::Buffer uniformBuffer =
+        context.device.CreateBuffer(&uniformBufferDesc);
+
+    std::vector<wgpu::BindGroupLayoutEntry> BGLayoutEntries(1);
+
+    BGLayoutEntries[0].binding = 0;
+    BGLayoutEntries[0].buffer.type = wgpu::BufferBindingType::Uniform;
+    BGLayoutEntries[0].buffer.minBindingSize = sizeof(c2::render::Uniforms);
+    BGLayoutEntries[0].buffer.hasDynamicOffset = false;
+    BGLayoutEntries[0].visibility =
+        wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
+
+    wgpu::BindGroupLayoutDescriptor BGLayoutDesc = {};
+    BGLayoutDesc.entries = BGLayoutEntries.data();
+    BGLayoutDesc.entryCount = BGLayoutEntries.size();
+    wgpu::BindGroupLayout BGLayout =
+        context.device.CreateBindGroupLayout(&BGLayoutDesc);
+
+    wgpu::PipelineLayoutDescriptor pipelineLayoutDesc = {};
+    pipelineLayoutDesc.bindGroupLayoutCount = 1;
+    pipelineLayoutDesc.bindGroupLayouts = &BGLayout;
+    wgpu::PipelineLayout pipelineLayout =
+        context.device.CreatePipelineLayout(&pipelineLayoutDesc);
+
+    std::vector<wgpu::BindGroupEntry> BGEntries(1);
+    BGEntries[0].binding = 0;
+    BGEntries[0].buffer = uniformBuffer;
+    BGEntries[0].offset = 0;
+    BGEntries[0].size = sizeof(c2::render::Uniforms);
+
+    wgpu::BindGroupDescriptor BGDesc = {};
+    BGDesc.entryCount = BGEntries.size();
+    BGDesc.entries = BGEntries.data();
+    BGDesc.layout = BGLayout;
+    wgpu::BindGroup bindGroup = context.device.CreateBindGroup(&BGDesc);
+
     // ============================================================================
     // Texture settup
     // ============================================================================
 
     wgpu::ShaderModule shaderModule =
-        createShaderModule(context.device, c2::hard::shader);
+        createShaderModule(context.device, c2::hard::shader1);
 
     wgpu::TextureDescriptor imageTextureDesc = {};
     imageTextureDesc.dimension = wgpu::TextureDimension::e2D;
@@ -207,6 +188,7 @@ int main(int argc, char** argv) {
 
     wgpu::RenderPipelineDescriptor scenePipelineDesc = {};
     scenePipelineDesc.depthStencil = nullptr;
+    scenePipelineDesc.layout = pipelineLayout;
 
     scenePipelineDesc.vertex.buffers = nullptr;
     scenePipelineDesc.vertex.bufferCount = 0;
@@ -274,6 +256,11 @@ int main(int argc, char** argv) {
         bool success = pollEvent(running, windowData);
         context.instance.ProcessEvents();
 
+        c2::render::Uniforms un;
+        un.pcmFrames = ImGui::GetTime();
+
+        context.queue.WriteBuffer(uniformBuffer, 0, &un,
+                                  sizeof(c2::render::Uniforms));
         ImGui_ImplWGPU_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
@@ -309,7 +296,7 @@ int main(int argc, char** argv) {
         colorAttachment.view = view;
         colorAttachment.loadOp = wgpu::LoadOp::Clear;
         colorAttachment.storeOp = wgpu::StoreOp::Store;
-        colorAttachment.clearValue = wgpu::Color{0.0, 0.0, 1.0, 1.0};
+        colorAttachment.clearValue = wgpu::Color{1.0, 1.0, 1.0, 1.0};
         renderPassDescriptor.colorAttachmentCount = 1;
         renderPassDescriptor.colorAttachments = &colorAttachment;
 
@@ -319,12 +306,44 @@ int main(int argc, char** argv) {
             encoder.BeginRenderPass(&scenePassDesc);
 
         scenePass.SetPipeline(scenePipeline);
+        scenePass.SetBindGroup(0, bindGroup);
         scenePass.Draw(3);
         scenePass.End();
 
-        RenderAnimatedMenu();
+        // RenderAnimatedMenu();
 
-        // DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
+        // DrawAnimatedCustomButton("daubi");
+
+        /*
+        static bool test = false;
+        AnimatedCheckbox("daubia", &test);
+        */
+        // firstTestWidget();
+        /*
+        ImGui::Begin("dasdsa");
+        HoverableText("dsaadsad");
+
+        ImGui::End();
+
+        */
+        DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
+
+        /*
+        ImGui::Begin("selectablebutton");
+        // shiftSelectableButton("test", "textt");
+
+        myButton("myButton", ImVec2(200.f, 200.f), ImColor(134, 24, 100, 255),
+                 ImColor(200, 160, 23, 255), ImColor(146, 23, 64, 255), 10.f);
+
+        * if (ImGui::IsItemHovered()) {
+            ImGui::Button("asdad");
+            shiftText("shift");
+        } */
+
+        // shiftText("asdad");
+
+        // ImGui::End();
+
         ImGui::Render();
 
         wgpu::RenderPassEncoder pass =

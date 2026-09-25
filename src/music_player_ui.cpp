@@ -1,8 +1,35 @@
 #include <C2Core/c2_log.hpp>
 #include <cstdint>
+#include <iostream>
 #include <music_player_ui.hpp>
 
 #include "audio.hpp"
+#include "imgui.h"
+
+int GetMaxCharactersThatFit(const char* text, float availableWidth) {
+    if (!text || availableWidth <= 0.0f) return 0;
+
+    int low = 0;
+    int high = (int)strlen(text);
+    int result = 0;
+
+    // Быстрый бинарный поиск по длине строки
+    while (low <= high) {
+        int mid = low + (high - low) / 2;
+
+        // Считаем размер подстроки от 0 до mid
+        ImVec2 size = ImGui::CalcTextSize(text, text + mid);
+
+        if (size.x <= availableWidth) {
+            result = mid;   // Запоминаем, этот кусок влезает
+            low = mid + 1;  // Пробуем взять больше символов
+        } else {
+            high = mid - 1;  // Не влезает, уменьшаем длину
+        }
+    }
+
+    return result;
+}
 
 void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                        const c2::audio::PlayerViewData& viewData,
@@ -71,7 +98,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
 
             for (int i = 0; i < static_cast<int>(player.playlist.tracks.size());
                  ++i) {
-                // Проверяем название и исполнителя одной строкой.
                 ImGuiTextBuffer searchable;
                 searchable.appendf("%s %s",
                                    player.playlist.tracks[i].title.c_str(),
@@ -79,12 +105,49 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                 if (!search.PassFilter(searchable.c_str())) continue;
 
                 ImGui::PushID(i);
-                if (ImGui::Selectable(player.playlist.tracks[i].title.c_str(),
+
+                float availableWidth = ImGui::GetContentRegionAvail().x;
+                std::string trackTitle;
+                int charsThatFit = GetMaxCharactersThatFit(
+                    player.playlist.tracks[i].title.c_str(), availableWidth);
+                trackTitle.resize(charsThatFit);
+
+                static int counter = 0;
+                static int selectableCounter = 0;
+                static int nonSelectableCounter = 0;
+
+                static float textTimer = 0.f;
+                static float delay = 0.75f;
+                size_t strLen = player.playlist.tracks[i].title.length();
+
+                textTimer += ImGui::GetIO().DeltaTime;
+
+                for (int j = 0; j < charsThatFit; j++) {
+                    trackTitle[j] =
+                        player.playlist.tracks[i].title[(counter + j) % strLen];
+                }
+
+                // C2Core::Log::info("trackTitle: %s\ncounter: %d",
+                //   trackTitle.c_str(), counter);
+
+                // C2Core::Log::info("%s",
+                //      player.playlist.tracks[i].title.c_str());
+
+                if (ImGui::Selectable(trackTitle.c_str(),
                                       player.playlist.currentIndex == i)) {
                     c2::audio::selectTrack(player, i);
                     c2::audio::playSound(player.audio);
                     c2::audio::updatePlayerViewData(player, current);
                 }
+
+                if (ImGui::IsItemHovered()) {
+                    if (textTimer >= delay) {
+                        counter++;
+                        counter = counter % strLen;
+                        textTimer = 0.f;
+                    }
+                }
+
                 const auto& track = player.playlist.tracks[i];
                 if (track.duration > 0) {
                     ImGui::TextDisabled("%s  /  %d:%02d", track.artist.c_str(),
