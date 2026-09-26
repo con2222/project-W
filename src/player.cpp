@@ -103,7 +103,6 @@ std::vector<Track> scanDirectory(const std::string& directoryPath) {
                                       ? tag->title().to8Bit(true)
                                       : entry.path().filename().string();
 
-                    C2Core::Log::info("%s", tag->title().to8Bit(true).c_str());
                     track.duration = f.audioProperties()->lengthInSeconds();
 
                     tracks.push_back(track);

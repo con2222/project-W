@@ -65,9 +65,6 @@ fn scene_fs(
 
     let uv = fragCoord.xy / resolution;
 
-    
-
-
     return vec4f(
         uv.x,
         uv.y,
@@ -80,7 +77,7 @@ fn scene_fs(
 
 inline const char* shader1 = R"(
 struct Uniforms {
-    pcmFrames: u32,
+    pcmFrames: f32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -107,15 +104,35 @@ fn scene_vs(@builtin(vertex_index) idx: u32) -> SceneVSOutput {
 fn scene_fs(
     @builtin(position) fragCoord: vec4f
 ) -> @location(0) vec4f {
+    let resolution = vec2f(1920.0, 1080.0);
+    
+    var uv = (fragCoord.xy / resolution) * 2.0 - vec2f(1.0, 1.0);    
+    uv.x *= resolution.x / resolution.y;
+    let time = uniforms.pcmFrames;
+    let d = length(uv);
+    
+    // Вычисляем угол для создания спиральных или радиальных искажений
+    let angle = atan2(uv.y, uv.x);
 
-    let resolution = vec2f(800.0, 600.0);
+    // Создаем расходящиеся кольца
+    let rings = sin(d * 10.0 - time * 4.0);
+    
+    // Добавляем искажение волной по кругу
+    let wave = sin(angle * 4.0 + time * 2.0) * 0.2;
+    
+    // Высчитываем толщину и яркость колец (эффект свечения)
+    let glow = 0.05 / abs(rings + wave);
 
-    let uv = fragCoord.xy / resolution;
+    // Динамически меняем цвета с течением времени и расстояния
+    let r = 0.5 + 0.5 * sin(time + d * 3.0);
+    let g = 0.2 + 0.2 * sin(time * 1.5 + angle);
+    let b = 0.5 + 0.5 * cos(time * 0.8 - d * 5.0);
 
+    // Умножаем базовый цвет на силу свечения
     return vec4f(
-        sin(uv.x * f32(uniforms.pcmFrames)),
-        sin(uv.y * f32(uniforms.pcmFrames)),
-        0.0f,
+        r * glow,
+        g * glow,
+        b * glow + 0.2, // Немного синего фона
         1.0
     );
 }

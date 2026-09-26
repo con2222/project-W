@@ -256,11 +256,6 @@ int main(int argc, char** argv) {
         bool success = pollEvent(running, windowData);
         context.instance.ProcessEvents();
 
-        c2::render::Uniforms un;
-        un.pcmFrames = ImGui::GetTime();
-
-        context.queue.WriteBuffer(uniformBuffer, 0, &un,
-                                  sizeof(c2::render::Uniforms));
         ImGui_ImplWGPU_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
@@ -275,6 +270,12 @@ int main(int argc, char** argv) {
         }
 
         c2::audio::updatePlayerViewData(player, viewData);
+
+        c2::render::Uniforms un;
+        un.pcmFrames = viewData.positionSeconds;
+
+        context.queue.WriteBuffer(uniformBuffer, 0, &un,
+                                  sizeof(c2::render::Uniforms));
 
         wgpu::SurfaceTexture surfaceTexture = {};
         windowData.surface.GetCurrentTexture(&surfaceTexture);

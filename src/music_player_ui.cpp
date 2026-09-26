@@ -38,6 +38,20 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
     static bool repeat = false, shuffle = false;
     static ImGuiTextFilter search;
 
+    static std::vector<int> counters;
+    static std::vector<float> textTimers;
+
+    static std::vector<float> scrollOffsets;
+
+    if (scrollOffsets.size() < player.playlist.tracks.size()) {
+        scrollOffsets.resize(player.playlist.tracks.size(), 0.0f);
+    }
+
+    if (counters.size() < player.playlist.tracks.size()) {
+        counters.resize(player.playlist.tracks.size(), 0);
+        textTimers.resize(player.playlist.tracks.size(), 0.0f);
+    }
+
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
                         ImVec2(16, 16));  // Отступ от края окна сверху и снизу
     ImGui::PushStyleVar(
@@ -98,6 +112,8 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
 
             for (int i = 0; i < static_cast<int>(player.playlist.tracks.size());
                  ++i) {
+                const auto& track = player.playlist.tracks[i];
+
                 ImGuiTextBuffer searchable;
                 searchable.appendf("%s %s",
                                    player.playlist.tracks[i].title.c_str(),
@@ -106,49 +122,42 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
 
                 ImGui::PushID(i);
 
-                float availableWidth = ImGui::GetContentRegionAvail().x;
-                std::string trackTitle;
-                int charsThatFit = GetMaxCharactersThatFit(
-                    player.playlist.tracks[i].title.c_str(), availableWidth);
-                trackTitle.resize(charsThatFit);
-
-                static int counter = 0;
-                static int selectableCounter = 0;
-                static int nonSelectableCounter = 0;
-
-                static float textTimer = 0.f;
-                static float delay = 0.75f;
-                size_t strLen = player.playlist.tracks[i].title.length();
-
-                textTimer += ImGui::GetIO().DeltaTime;
-
-                for (int j = 0; j < charsThatFit; j++) {
-                    trackTitle[j] =
-                        player.playlist.tracks[i].title[(counter + j) % strLen];
-                }
-
-                // C2Core::Log::info("trackTitle: %s\ncounter: %d",
-                //   trackTitle.c_str(), counter);
-
-                // C2Core::Log::info("%s",
-                //      player.playlist.tracks[i].title.c_str());
-
-                if (ImGui::Selectable(trackTitle.c_str(),
+                std::string selectableId =
+                    "###Track_Selectable_" + std::to_string(i);
+                if (ImGui::Selectable(selectableId.c_str(),
                                       player.playlist.currentIndex == i)) {
                     c2::audio::selectTrack(player, i);
                     c2::audio::playSound(player.audio);
                     c2::audio::updatePlayerViewData(player, current);
                 }
 
-                if (ImGui::IsItemHovered()) {
-                    if (textTimer >= delay) {
-                        counter++;
-                        counter = counter % strLen;
-                        textTimer = 0.f;
+                ImVec2 itemMin = ImGui::GetItemRectMin();
+                ImVec2 itemMax = ImGui::GetItemRectMax();
+                bool isHovered = ImGui::IsItemHovered();
+
+                ImGui::PushClipRect(itemMin, itemMax, true);
+
+                float textWidth = ImGui::CalcTextSize(track.title.c_str()).x;
+                float availWidth = itemMax.x - itemMin.x;
+
+                if (isHovered && textWidth > availWidth) {
+                    scrollOffsets[i] += 50.f * ImGui::GetIO().DeltaTime;
+
+                    if (scrollOffsets[i] > textWidth + 20.f) {
+                        scrollOffsets[i] = -availWidth;
                     }
+                } else if (!isHovered) {
+                    scrollOffsets[i] = 0.f;
                 }
 
-                const auto& track = player.playlist.tracks[i];
+                ImVec2 textPos =
+                    ImVec2(itemMin.x - scrollOffsets[i], itemMin.y);
+                ImGui::GetWindowDrawList()->AddText(
+                    textPos, ImGui::GetColorU32(ImGuiCol_Text),
+                    track.title.c_str());
+
+                ImGui::PopClipRect();
+
                 if (track.duration > 0) {
                     ImGui::TextDisabled("%s  /  %d:%02d", track.artist.c_str(),
                                         track.duration / 60,
@@ -161,6 +170,18 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
             }
         }
         ImGui::EndChild();  // Нужен даже при BeginChild() == false.
+
+        if (c2::audio::isSoundAtEnd(player.audio)) {
+            if (player.playlist.currentIndex + 1 <
+                player.playlist.tracks.size()) {
+                c2::audio::selectTrack(player,
+                                       player.playlist.currentIndex + 1);
+                c2::audio::playSound(player.audio);
+            } else {
+                c2::audio::selectTrack(player, 0);
+                c2::audio::playSound(player.audio);
+            }
+        }
 
         ImGui::SameLine();
 

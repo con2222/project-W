@@ -5,7 +5,8 @@
 namespace c2::render {
 
 struct Uniforms {
-    uint32_t pcmFrames;
+    float pcmFrames;
+    float padding[3];
 };
 
 }  // namespace c2::render
