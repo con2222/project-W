@@ -9,6 +9,7 @@
 #include <C2Core/c2_log.hpp>
 #include <C2Core/time_core.hpp>
 #include <audio.hpp>
+#include <command.hpp>
 #include <hardcode.hpp>
 #include <interfacetest.hpp>
 #include <music_player_ui.hpp>

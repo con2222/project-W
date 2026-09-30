@@ -8,6 +8,8 @@
 #include <iostream>
 #include <player.hpp>
 
+#include "audio.hpp"
+
 namespace c2::audio {
 
 bool selectTrack(PlayerState& player, int index) {
@@ -165,4 +167,36 @@ void printAudioMetadata(const std::string& filePath) {
     }
     std::cout << "========================================\n\n";
 }
+
+ma_result playTrack(PlayerState& player) {
+    return c2::audio::playSound(player.audio);
+}
+ma_result pausetrack(PlayerState& player) {
+    return c2::audio::pauseSound(player.audio);
+}
+
+bool nextTrack(PlayerState& player) {
+    if (player.playlist.currentIndex + 1 < player.playlist.tracks.size()) {
+        return selectTrack(player, player.playlist.currentIndex + 1);
+    }
+    return selectTrack(player, 0);
+}
+
+bool prevTrack(PlayerState& player) {
+    if (player.playlist.currentIndex - 1 >= 0) {
+        return selectTrack(player, player.playlist.currentIndex - 1);
+    }
+    return selectTrack(player, player.playlist.tracks.size() - 1);
+}
+
+ma_result seekTrack(PlayerState& player, ma_uint64 frame) {
+    return c2::audio::soundSeekToPCMFrame(player.audio, frame);
+}
+
+void setTrackVolume(PlayerState& player, float volume) {
+    c2::audio::setSoundVolume(player.audio, volume);
+}
+
+void updatePlayer(PlayerState& player,
+                  const std::vector<Command>& commandQueue) {}
 }  // namespace c2::audio
