@@ -7,7 +7,9 @@
 #include <cctype>
 #include <command.hpp>
 #include <iostream>
+#include <numeric>
 #include <player.hpp>
+#include <random>
 
 #include "audio.hpp"
 
@@ -178,17 +180,43 @@ ma_result pauseTrack(PlayerState& player) {
 }
 
 bool nextTrack(PlayerState& player) {
-    if (player.playlist.currentIndex + 1 < player.playlist.tracks.size()) {
-        return selectTrack(player, player.playlist.currentIndex + 1);
+    int trackIndex = 0;
+    if (player.params.isShuffle) {
+        if (player.playlist.shufflePosition >=
+            player.playlist.shuffleQueue.size()) {
+            generateShuffleQueue(player);
+            player.playlist.shufflePosition = 1;
+        }
+        trackIndex =
+            player.playlist.shuffleQueue[player.playlist.shufflePosition];
+        player.playlist.shufflePosition++;
+    } else {
+        if (player.playlist.currentIndex + 1 < player.playlist.tracks.size()) {
+            trackIndex = player.playlist.currentIndex + 1;
+        } else {
+            trackIndex = 0;
+        }
     }
-    return selectTrack(player, 0);
+    return selectTrack(player, trackIndex);
 }
 
 bool prevTrack(PlayerState& player) {
-    if (player.playlist.currentIndex - 1 >= 0) {
-        return selectTrack(player, player.playlist.currentIndex - 1);
+    int trackIndex = 0;
+    if (player.params.isShuffle) {
+        int target = player.playlist.shufflePosition - 2;
+        if (target < 0) {
+            target += player.playlist.shuffleQueue.size();
+        }
+        trackIndex = player.playlist.shuffleQueue[target];
+        player.playlist.shufflePosition = target + 1;
+    } else {
+        if (player.playlist.currentIndex - 1 >= 0) {
+            trackIndex = player.playlist.currentIndex - 1;
+        } else {
+            trackIndex = player.playlist.tracks.size() - 1;
+        }
     }
-    return selectTrack(player, player.playlist.tracks.size() - 1);
+    return selectTrack(player, trackIndex);
 }
 
 ma_result seekTrack(PlayerState& player, ma_uint64 frame) {
@@ -200,41 +228,113 @@ void setTrackVolume(PlayerState& player, float volume) {
 }
 
 void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue) {
-    while (!commandQueue.empty()) {
-        Command cmd = commandQueue.front();
-        commandQueue.erase(commandQueue.begin());  // WARN:
-
+    for (const auto& cmd : commandQueue) {
         switch (cmd.command) {
             case CommandType::Next: {
-                nextTrack(player);
+                if (!nextTrack(player)) {
+                    C2Core::Log::error("Failed to switch to the next track.");
+                    break;
+                }
+                ma_result result = playTrack(player);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to play track: %d", result);
+                    break;
+                }
                 break;
             }
             case CommandType::Pause: {
-                pauseTrack(player);
+                ma_result result = pauseTrack(player);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to pause track: %d", result);
+                }
                 break;
             }
             case CommandType::Prev: {
-                prevTrack(player);
+                if (!prevTrack(player)) {
+                    C2Core::Log::error(
+                        "Failed to switch to the previous track.");
+                    break;
+                }
+                ma_result result = playTrack(player);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to play track: %d", result);
+                    break;
+                }
                 break;
             }
             case CommandType::Play: {
-                playTrack(player);
+                ma_result result = playTrack(player);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to play track: %d", result);
+                }
                 break;
             }
             case CommandType::Select: {
-                selectTrack(player, cmd.index);
+                if (!selectTrack(player, cmd.index)) {
+                    C2Core::Log::error("Failed to select track at index: %d",
+                                       cmd.index);
+                }
+                break;
             }
             case CommandType::Seek: {
-                seekTrack(player, cmd.frame);
+                ma_result result = seekTrack(player, cmd.frame);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to seek to frame %llu: %d",
+                                       cmd.frame, result);
+                }
+                break;
             }
             case CommandType::SetVolume: {
                 setTrackVolume(player, cmd.volume);
+                break;
+            }
+            case CommandType::ToggleShuffle: {
+                if (!player.params.isShuffle) {
+                    player.params.isShuffle = true;
+                    generateShuffleQueue(player);
+                    player.playlist.shufflePosition = 1;
+                } else {
+                    player.params.isShuffle = false;
+                }
+                break;
+            }
+            case CommandType::ToggleRepeat: {
+                player.params.isRepeat = player.params.isRepeat ? false : true;
+                break;
             }
         }
     }
 
+    commandQueue.clear();
+
     if (c2::audio::isSoundAtEnd(player.audio)) {
-        c2::audio::nextTrack(player);
+        if (!player.params.isRepeat) {
+            if (!c2::audio::nextTrack(player)) {
+                C2Core::Log::error(
+                    "Failed to auto-switch to next track at the end of current "
+                    "track.");
+            }
+            ma_result result = playTrack(player);
+            if (result != MA_SUCCESS) {
+                C2Core::Log::error("Failed to play track: %d", result);
+            }
+        } else {
+            seekTrack(player, 0);
+            ma_result result = playTrack(player);
+            if (result != MA_SUCCESS) {
+                C2Core::Log::error("Failed to play track: %d", result);
+            }
+        }
+    }
+}
+
+void generateShuffleQueue(PlayerState& player) {
+    if (player.params.isShuffle) {
+        auto& queue = player.playlist.shuffleQueue;
+        queue.resize(player.playlist.tracks.size());
+        std::iota(queue.begin(), queue.end(), 0);
+        std::swap(queue[0], queue[player.playlist.currentIndex]);
+        std::shuffle(queue.begin() + 1, queue.end(), player.playlist.rng);
     }
 }
 }  // namespace c2::audio

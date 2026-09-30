@@ -12,6 +12,8 @@ enum class CommandType : uint8_t {
     Pause,
     Seek,
     SetVolume,
+    ToggleRepeat,
+    ToggleShuffle,
 };
 
 struct Command {

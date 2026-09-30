@@ -135,11 +135,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                         .command = c2::audio::CommandType::Play});
 
                     C2Core::Log::info("select track");
-
-                    /*
-                    c2::audio::selectTrack(player, i);
-                    c2::audio::playSound(player.audio);
-                    c2::audio::updatePlayerViewData(player, current); */
                 }
 
                 ImVec2 itemMin = ImGui::GetItemRectMin();
@@ -182,19 +177,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         }
         ImGui::EndChild();  // Нужен даже при BeginChild() == false.
 
-        /*
-        if (c2::audio::isSoundAtEnd(player.audio)) {
-            if (player.playlist.currentIndex + 1 <
-                player.playlist.tracks.size()) {
-                c2::audio::selectTrack(player,
-                                       player.playlist.currentIndex + 1);
-                c2::audio::playSound(player.audio);
-            } else {
-                c2::audio::selectTrack(player, 0);
-                c2::audio::playSound(player.audio);
-            }
-        } */
-
         ImGui::SameLine();
 
         // СПРАВА: ширина 0 занимает оставшееся место.
@@ -231,12 +213,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                     : player.playlist.currentIndex - 1;
             commandQueue.emplace_back(
                 c2::audio::Command{.command = c2::audio::CommandType::Prev});
-
-            /* prev track
-            c2::audio::selectTrack(player, index);
-            c2::audio::playSound(player.audio);
-            c2::audio::updatePlayerViewData(player, current);
-            */
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
@@ -247,24 +223,12 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                                                   : "Play###play";
         if (ImGui::Button(playLabel, ImVec2(100, 0))) {
             c2::audio::Command cmd;
-
-            /*const ma_result result = current.isPlaying
-                                         ? c2::audio::pauseSound(player.audio)
-                                         : c2::audio::playSound(player.audio);
-
-
-            if (result != MA_SUCCESS) {
-                C2Core::Log::error("Can't change playback state: %d", result);
-            }
-            */
-
             if (current.isPlaying) {
                 cmd.command = c2::audio::CommandType::Pause;
             } else {
                 cmd.command = c2::audio::CommandType::Play;
             }
             commandQueue.push_back(cmd);
-            c2::audio::updatePlayerViewData(player, current);
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
@@ -273,24 +237,23 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         if (ImGui::Button("Next", ImVec2(90, 0))) {
             const int index = (player.playlist.currentIndex + 1) %
                               static_cast<int>(player.playlist.tracks.size());
-            /*
-            c2::audio::selectTrack(player, index);
-            if (c2::audio::playSound(player.audio) != MA_SUCCESS) {
-                C2Core::Log::error("Can't set next track");
-            }*/
             c2::audio::Command cmd;
             cmd.command = c2::audio::CommandType::Next;
             commandQueue.push_back(cmd);
-
-            c2::audio::updatePlayerViewData(player, current);
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        // These two controls are still placeholders for later playlist
-        // behavior.
-        ImGui::Checkbox("Repeat", &repeat);
+
+        if (ImGui::Checkbox("Repeat", &repeat)) {
+            commandQueue.emplace_back(c2::audio::Command{
+                .command = c2::audio::CommandType::ToggleRepeat});
+        }
         ImGui::SameLine();
-        ImGui::Checkbox("Shuffle", &shuffle);
+
+        if (ImGui::Checkbox("Shuffle", &shuffle)) {
+            commandQueue.emplace_back(c2::audio::Command{
+                .command = c2::audio::CommandType::ToggleShuffle});
+        }
 
         // Edit a local value, then submit a seek in the sound's PCM frame
         // units.
@@ -305,7 +268,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         if (ImGui::IsItemActive()) {
             commandQueue.emplace_back(
                 c2::audio::Command{.command = c2::audio::CommandType::Pause});
-            // c2::audio::pauseSound(player.audio);
         }
 
         if (currentDurationChanged) {
@@ -313,15 +275,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                                   player.soundAudioFormat.pSampleRate;
             const auto frame = static_cast<ma_uint64>(std::clamp(
                 target, 0.0, static_cast<double>(player.durationFrames)));
-
-            /*const ma_result result =
-                c2::audio::soundSeekToPCMFrame(player.audio, frame);
-
-            if (result != MA_SUCCESS) {
-                C2Core::Log::error("Can't seek sound: %d", result);
-            }
-
-            */
 
             commandQueue.emplace_back(c2::audio::Command{
                 .command = c2::audio::CommandType::Seek, .frame = frame});
@@ -331,7 +284,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         if (ImGui::IsItemDeactivated()) {
             commandQueue.emplace_back(
                 c2::audio::Command{.command = c2::audio::CommandType::Play});
-            // c2::audio::playSound(player.audio);
         }
 
         ImGui::EndDisabled();
@@ -352,7 +304,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                 commandQueue.emplace_back(c2::audio::Command{
                     .command = c2::audio::CommandType::SetVolume,
                     .volume = player.volume});
-                // c2::audio::setSoundVolume(player.audio, player.volume);
             }
         }
     }
