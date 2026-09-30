@@ -13,6 +13,7 @@
 #include <hardcode.hpp>
 #include <interfacetest.hpp>
 #include <music_player_ui.hpp>
+#include <player.hpp>
 #include <render.hpp>
 #include <webgpu_context.hpp>
 #include <webgpu_utils.hpp>
@@ -250,6 +251,7 @@ int main(int argc, char** argv) {
 
     int running = 1;
     c2::audio::PlayerViewData viewData{};
+    std::vector<c2::audio::Command> commandQueue;
 
     while (running) {
         C2Core::Time::startFrame(timeCtx);
@@ -328,8 +330,10 @@ int main(int argc, char** argv) {
         ImGui::End();
 
         */
-        DrawMusicPlayerUI(imageView, viewData, player, dockspaceID);
+        DrawMusicPlayerUI(imageView, viewData, player, commandQueue,
+                          dockspaceID);
 
+        c2::audio::updatePlayer(player, commandQueue);
         /*
         ImGui::Begin("selectablebutton");
         // shiftSelectableButton("test", "textt");

@@ -38,7 +38,6 @@ ma_result playTrack(PlayerState& player);
 ma_result pauseTrack(PlayerState& player);
 ma_result seekTrack(PlayerState& player, ma_uint64 frame);
 void setTrackVolume(PlayerState& player);
-void updatePlayer(PlayerState& player,
-                  const std::vector<Command>& commandQueue);
+void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue);
 
 }  // namespace c2::audio

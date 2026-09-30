@@ -5,6 +5,7 @@
 #include <C2Core/c2_log.hpp>
 #include <algorithm>
 #include <cctype>
+#include <command.hpp>
 #include <iostream>
 #include <player.hpp>
 
@@ -48,6 +49,7 @@ bool selectTrack(PlayerState& player, int index) {
     player.playlist.currentIndex = index;
     player.playlist.tracks[index].duration = static_cast<int>(
         player.durationFrames / player.soundAudioFormat.pSampleRate);
+
     setSoundVolume(player.audio, player.volume);
 
     return true;
@@ -171,7 +173,7 @@ void printAudioMetadata(const std::string& filePath) {
 ma_result playTrack(PlayerState& player) {
     return c2::audio::playSound(player.audio);
 }
-ma_result pausetrack(PlayerState& player) {
+ma_result pauseTrack(PlayerState& player) {
     return c2::audio::pauseSound(player.audio);
 }
 
@@ -197,6 +199,42 @@ void setTrackVolume(PlayerState& player, float volume) {
     c2::audio::setSoundVolume(player.audio, volume);
 }
 
-void updatePlayer(PlayerState& player,
-                  const std::vector<Command>& commandQueue) {}
+void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue) {
+    while (!commandQueue.empty()) {
+        Command cmd = commandQueue.front();
+        commandQueue.erase(commandQueue.begin());  // WARN:
+
+        switch (cmd.command) {
+            case CommandType::Next: {
+                nextTrack(player);
+                break;
+            }
+            case CommandType::Pause: {
+                pauseTrack(player);
+                break;
+            }
+            case CommandType::Prev: {
+                prevTrack(player);
+                break;
+            }
+            case CommandType::Play: {
+                playTrack(player);
+                break;
+            }
+            case CommandType::Select: {
+                selectTrack(player, cmd.index);
+            }
+            case CommandType::Seek: {
+                seekTrack(player, cmd.frame);
+            }
+            case CommandType::SetVolume: {
+                setTrackVolume(player, cmd.volume);
+            }
+        }
+    }
+
+    if (c2::audio::isSoundAtEnd(player.audio)) {
+        c2::audio::nextTrack(player);
+    }
+}
 }  // namespace c2::audio

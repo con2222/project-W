@@ -10,6 +10,8 @@
 
 void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                        const c2::audio::PlayerViewData& viewData,
-                       c2::audio::PlayerState& player, ImGuiID dockspaceId = 0);
+                       c2::audio::PlayerState& player,
+                       std::vector<c2::audio::Command>& commandQueue,
+                       ImGuiID dockspaceId = 0);
 
 int GetMaxCharactersThatFit(const char* text, float availableWidth);
