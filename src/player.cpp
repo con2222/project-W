@@ -71,9 +71,9 @@ void updatePlayerViewData(PlayerState& player, PlayerViewData& viewData) {
 
     const double sampleRate = player.soundAudioFormat.pSampleRate;
     viewData.positionSeconds =
-        static_cast<float>(viewData.positionFrames / sampleRate);
+        static_cast<double>(viewData.positionFrames / sampleRate);
     viewData.durationSeconds =
-        static_cast<float>(viewData.durationFrames / sampleRate);
+        static_cast<double>(viewData.durationFrames / sampleRate);
 }
 
 std::vector<Track> scanDirectory(const std::string& directoryPath) {
@@ -225,6 +225,7 @@ ma_result seekTrack(PlayerState& player, ma_uint64 frame) {
 
 void setTrackVolume(PlayerState& player, float volume) {
     c2::audio::setSoundVolume(player.audio, volume);
+    player.volume = volume;
 }
 
 void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue) {
@@ -293,6 +294,7 @@ void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue) {
                     player.params.isShuffle = true;
                     generateShuffleQueue(player);
                     player.playlist.shufflePosition = 1;
+                    C2Core::Log::info("get %d", player.params.isShuffle);
                 } else {
                     player.params.isShuffle = false;
                 }
@@ -336,5 +338,12 @@ void generateShuffleQueue(PlayerState& player) {
         std::swap(queue[0], queue[player.playlist.currentIndex]);
         std::shuffle(queue.begin() + 1, queue.end(), player.playlist.rng);
     }
+}
+
+ma_uint64 convertSecondsToPSMFrames(const PlayerState& player, double seconds) {
+    const double target = seconds * player.soundAudioFormat.pSampleRate;
+    const auto frame = static_cast<ma_uint64>(
+        std::clamp(target, 0.0, static_cast<double>(player.durationFrames)));
+    return frame;
 }
 }  // namespace c2::audio

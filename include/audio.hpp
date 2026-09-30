@@ -22,8 +22,8 @@ struct PlayerViewData {
     bool isPlaying = false;
     bool atEnd = false;
     float volume = 1.0f;
-    float positionSeconds = 0.0f;
-    float durationSeconds = 0.0f;
+    double positionSeconds = 0.0f;
+    double durationSeconds = 0.0f;
     ma_uint64 positionFrames = 0;
     ma_uint64 durationFrames = 0;
 };

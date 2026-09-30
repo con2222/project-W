@@ -38,7 +38,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                        std::vector<c2::audio::Command>& commandQueue,
                        ImGuiID dockspaceId) {
     c2::audio::PlayerViewData current = viewData;
-    static bool repeat = false, shuffle = false;
     static ImGuiTextFilter search;
 
     static std::vector<int> counters;
@@ -207,10 +206,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         ImGui::Separator();
         ImGui::BeginDisabled(player.playlist.tracks.empty());
         if (ImGui::Button("Previous", ImVec2(90, 0))) {
-            const int index =
-                player.playlist.currentIndex <= 0
-                    ? static_cast<int>(player.playlist.tracks.size()) - 1
-                    : player.playlist.currentIndex - 1;
             commandQueue.emplace_back(
                 c2::audio::Command{.command = c2::audio::CommandType::Prev});
         }
@@ -235,8 +230,6 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
 
         ImGui::BeginDisabled(player.playlist.tracks.empty());
         if (ImGui::Button("Next", ImVec2(90, 0))) {
-            const int index = (player.playlist.currentIndex + 1) %
-                              static_cast<int>(player.playlist.tracks.size());
             c2::audio::Command cmd;
             cmd.command = c2::audio::CommandType::Next;
             commandQueue.push_back(cmd);
@@ -244,6 +237,8 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         ImGui::EndDisabled();
         ImGui::SameLine();
 
+        bool repeat = player.params.isRepeat;
+        bool shuffle = player.params.isShuffle;
         if (ImGui::Checkbox("Repeat", &repeat)) {
             commandQueue.emplace_back(c2::audio::Command{
                 .command = c2::audio::CommandType::ToggleRepeat});
@@ -271,14 +266,8 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         }
 
         if (currentDurationChanged) {
-            const double target = static_cast<double>(position) *
-                                  player.soundAudioFormat.pSampleRate;
-            const auto frame = static_cast<ma_uint64>(std::clamp(
-                target, 0.0, static_cast<double>(player.durationFrames)));
-
             commandQueue.emplace_back(c2::audio::Command{
-                .command = c2::audio::CommandType::Seek, .frame = frame});
-            c2::audio::updatePlayerViewData(player, current);
+                .command = c2::audio::CommandType::Seek, .frame = c2::audio::convertSecondsToPSMFrames(player, position)});
         }
 
         if (ImGui::IsItemDeactivated()) {
@@ -299,11 +288,10 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
         float volume = current.volume * 100.0f;
         if (ImGui::SliderFloat("##volume", &volume, 0.0f, 100.0f, "%.0f%%",
                                ImGuiSliderFlags_AlwaysClamp)) {
-            player.volume = volume / 100.0f;
             if (player.audio.hasSound) {
                 commandQueue.emplace_back(c2::audio::Command{
                     .command = c2::audio::CommandType::SetVolume,
-                    .volume = player.volume});
+                    .volume = volume / 100.f});
             }
         }
     }
