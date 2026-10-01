@@ -52,6 +52,7 @@ set(SOURCES
     src/music_player_ui.cpp
     src/player.cpp
     src/command.cpp
+    src/imgui_layer.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

@@ -1,3 +1,4 @@
+#include <backends/imgui_impl_sdl3.h>
 #include <sdl3webgpu.h>
 
 #include <C2Core/c2_log.hpp>
@@ -6,7 +7,7 @@
 #include <webgpu_context.hpp>
 #include <window.hpp>
 
-namespace c2 {
+namespace c2::platform {
 
 void syncFromWindow(WindowData& data) {
     int width, height;
@@ -60,4 +61,30 @@ bool isSameConfig(const wgpu::SurfaceConfiguration& a,
            a.presentMode == b.presentMode;
 }
 
-}  // namespace c2
+bool pollEvent(int& running, WindowData& data) {
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+        ImGui_ImplSDL3_ProcessEvent(&event);
+        switch (event.type) {
+            case SDL_EVENT_QUIT: {
+                running = 0;
+                break;
+            }
+            case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
+                c2::platform::syncFromWindow(data);
+                C2Core::Log::info("Window Resized. New Size: %dx%d",
+                                  data.targetConfig.width,
+                                  data.targetConfig.height);
+                data.surface.Configure(&data.targetConfig);
+                data.currentConfig = data.targetConfig;
+                break;
+            }
+            case SDL_EVENT_KEY_DOWN:
+                if (event.key.key == SDLK_ESCAPE) running = false;
+        }
+    }
+
+    return true;
+}
+
+}  // namespace c2::platform

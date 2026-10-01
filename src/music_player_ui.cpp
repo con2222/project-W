@@ -7,6 +7,7 @@
 #include "audio.hpp"
 #include "imgui.h"
 
+namespace c2::ui {
 int GetMaxCharactersThatFit(const char* text, float availableWidth) {
     if (!text || availableWidth <= 0.0f) return 0;
 
@@ -32,27 +33,24 @@ int GetMaxCharactersThatFit(const char* text, float availableWidth) {
     return result;
 }
 
-void DrawMusicPlayerUI(wgpu::TextureView& imageView,
+void ensureCapacity(MusicPlayerUIState& state, size_t trackCount) {
+    if (state.scrollOffsets.size() < trackCount) {
+        state.scrollOffsets.resize(trackCount, 0.0f);
+    }
+    if (state.counters.size() < trackCount) {
+        state.counters.resize(trackCount, 0);
+        state.textTimers.resize(trackCount, 0.0f);
+    }
+}
+
+void drawMusicPlayerUI(wgpu::TextureView& imageView,
                        const c2::audio::PlayerViewData& viewData,
                        c2::audio::PlayerState& player,
+                       c2::ui::MusicPlayerUIState& uiState,
                        std::vector<c2::audio::Command>& commandQueue,
                        ImGuiID dockspaceId) {
     c2::audio::PlayerViewData current = viewData;
-    static ImGuiTextFilter search;
-
-    static std::vector<int> counters;
-    static std::vector<float> textTimers;
-
-    static std::vector<float> scrollOffsets;
-
-    if (scrollOffsets.size() < player.playlist.tracks.size()) {
-        scrollOffsets.resize(player.playlist.tracks.size(), 0.0f);
-    }
-
-    if (counters.size() < player.playlist.tracks.size()) {
-        counters.resize(player.playlist.tracks.size(), 0);
-        textTimers.resize(player.playlist.tracks.size(), 0.0f);
-    }
+    ensureCapacity(uiState, player.playlist.tracks.size());
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
                         ImVec2(16, 16));  // Отступ от края окна сверху и снизу
@@ -106,7 +104,7 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                               ImGuiChildFlags_Borders)) {
             ImGui::TextUnformatted("LIBRARY");
             ImGui::TextDisabled("%zu tracks", player.playlist.tracks.size());
-            search.Draw("##search", -FLT_MIN);
+            uiState.search.Draw("##search", -FLT_MIN);
             if (ImGui::IsItemHovered())  // Проверяет последний добавленный
                                          // элемент, то есть search.draw()
                 ImGui::SetTooltip("Filter by title or artist");
@@ -120,7 +118,7 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                 searchable.appendf("%s %s",
                                    player.playlist.tracks[i].title.c_str(),
                                    player.playlist.tracks[i].artist.c_str());
-                if (!search.PassFilter(searchable.c_str())) continue;
+                if (!uiState.search.PassFilter(searchable.c_str())) continue;
 
                 ImGui::PushID(i);
 
@@ -146,17 +144,17 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
                 float availWidth = itemMax.x - itemMin.x;
 
                 if (isHovered && textWidth > availWidth) {
-                    scrollOffsets[i] += 50.f * ImGui::GetIO().DeltaTime;
+                    uiState.scrollOffsets[i] += 50.f * ImGui::GetIO().DeltaTime;
 
-                    if (scrollOffsets[i] > textWidth + 20.f) {
-                        scrollOffsets[i] = -availWidth;
+                    if (uiState.scrollOffsets[i] > textWidth + 20.f) {
+                        uiState.scrollOffsets[i] = -availWidth;
                     }
                 } else if (!isHovered) {
-                    scrollOffsets[i] = 0.f;
+                    uiState.scrollOffsets[i] = 0.f;
                 }
 
                 ImVec2 textPos =
-                    ImVec2(itemMin.x - scrollOffsets[i], itemMin.y);
+                    ImVec2(itemMin.x - uiState.scrollOffsets[i], itemMin.y);
                 ImGui::GetWindowDrawList()->AddText(
                     textPos, ImGui::GetColorU32(ImGuiCol_Text),
                     track.title.c_str());
@@ -267,7 +265,9 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
 
         if (currentDurationChanged) {
             commandQueue.emplace_back(c2::audio::Command{
-                .command = c2::audio::CommandType::Seek, .frame = c2::audio::convertSecondsToPSMFrames(player, position)});
+                .command = c2::audio::CommandType::Seek,
+                .frame =
+                    c2::audio::convertSecondsToPSMFrames(player, position)});
         }
 
         if (ImGui::IsItemDeactivated()) {
@@ -298,3 +298,4 @@ void DrawMusicPlayerUI(wgpu::TextureView& imageView,
     ImGui::End();  // Нужен даже при Begin() == false.
     ImGui::PopStyleVar(5);
 }
+}  // namespace c2::ui

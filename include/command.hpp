@@ -1,3 +1,5 @@
+#pragma once
+
 #include <miniaudio.h>
 
 #include <C2Core/c2_log.hpp>

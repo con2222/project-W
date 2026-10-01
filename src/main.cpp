@@ -11,6 +11,7 @@
 #include <audio.hpp>
 #include <command.hpp>
 #include <hardcode.hpp>
+#include <imgui_layer.hpp>
 #include <interfacetest.hpp>
 #include <music_player_ui.hpp>
 #include <player.hpp>
@@ -26,199 +27,23 @@ extern "C" {
 #include <cstdlib>
 #include <iostream>
 
-void initImGui(c2::gpu::GPUContext& ctx, c2::WindowData data);
-
-bool pollEvent(int& running, c2::WindowData& data) {
-    SDL_Event event;
-    while (SDL_PollEvent(&event)) {
-        ImGui_ImplSDL3_ProcessEvent(&event);
-        switch (event.type) {
-            case SDL_EVENT_QUIT: {
-                running = 0;
-                break;
-            }
-            case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
-                c2::syncFromWindow(data);
-                C2Core::Log::info("Window Resized. New Size: %dx%d",
-                                  data.targetConfig.width,
-                                  data.targetConfig.height);
-                data.surface.Configure(&data.targetConfig);
-                data.currentConfig = data.targetConfig;
-                break;
-            }
-            case SDL_EVENT_KEY_DOWN:
-                if (event.key.key == SDLK_ESCAPE) running = false;
-        }
-    }
-
-    return true;
-}
-
-bool setup(c2::gpu::GPUContext& ctx, c2::WindowData data) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == false) {
-        C2Core::Log::error("SDL init error: %s", SDL_GetError());
-        return false;
-    };
-
-    initImGui(ctx, data);
-
-    return true;
-}
-
-void initImGui(c2::gpu::GPUContext& ctx, c2::WindowData data) {
-    float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    (void)io;
-    io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-    io.ConfigFlags |=
-        ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-
-    ImGui::StyleColorsDark();
-
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.ScaleAllSizes(
-        main_scale);  // Bake a fixed style scale. (until we have a solution for
-                      // dynamic style scaling, changing this requires resetting
-                      // Style + calling this again)
-    style.FontScaleDpi =
-        main_scale;  // Set initial font scale. (in docking branch: using
-                     // io.ConfigDpiScaleFonts=true automatically overrides this
-                     // for every window depending on the current monitor)
-
-    ImGui_ImplSDL3_InitForOther(data.window);
-
-    ImGui_ImplWGPU_InitInfo init_info;
-    init_info.Device = ctx.device.Get();
-    init_info.NumFramesInFlight = 3;
-    init_info.RenderTargetFormat =
-        static_cast<WGPUTextureFormat>(data.currentConfig.format);
-    init_info.DepthStencilFormat = WGPUTextureFormat_Undefined;
-    ImGui_ImplWGPU_Init(&init_info);
-}
-
-wgpu::ShaderModule createShaderModule(const wgpu::Device& device,
-                                      const char* source) {
-    wgpu::ShaderSourceWGSL wgslDesc;
-    wgslDesc.code = source;
-    wgpu::ShaderModuleDescriptor descriptor;
-    descriptor.nextInChain = &wgslDesc;
-    return device.CreateShaderModule(&descriptor);
-}
-
 int main(int argc, char** argv) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) == false) {
         C2Core::Log::error("SDL init error: %s", SDL_GetError());
         return EXIT_FAILURE;
     };
     c2::gpu::GPUContext context = c2::gpu::getGPUContext();
-    c2::WindowData windowData = c2::createWindow(context);
+    c2::platform::WindowData windowData = c2::platform::createWindow(context);
     initImGui(context, windowData);
 
+    c2::audio::PlayerViewData viewData{};
+    std::vector<c2::audio::Command> commandQueue;
+    c2::ui::MusicPlayerUIState uiState;
+    c2::render::RendererState rendererState;
+    int running = 1;
+
     ImGuiIO& io = ImGui::GetIO();
-
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    wgpu::BufferDescriptor uniformBufferDesc = {};
-    uniformBufferDesc.mappedAtCreation = false;
-    uniformBufferDesc.size = sizeof(c2::render::Uniforms);
-    uniformBufferDesc.usage =
-        wgpu::BufferUsage::Uniform | wgpu::BufferUsage::CopyDst;
-    wgpu::Buffer uniformBuffer =
-        context.device.CreateBuffer(&uniformBufferDesc);
-
-    std::vector<wgpu::BindGroupLayoutEntry> BGLayoutEntries(1);
-
-    BGLayoutEntries[0].binding = 0;
-    BGLayoutEntries[0].buffer.type = wgpu::BufferBindingType::Uniform;
-    BGLayoutEntries[0].buffer.minBindingSize = sizeof(c2::render::Uniforms);
-    BGLayoutEntries[0].buffer.hasDynamicOffset = false;
-    BGLayoutEntries[0].visibility =
-        wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment;
-
-    wgpu::BindGroupLayoutDescriptor BGLayoutDesc = {};
-    BGLayoutDesc.entries = BGLayoutEntries.data();
-    BGLayoutDesc.entryCount = BGLayoutEntries.size();
-    wgpu::BindGroupLayout BGLayout =
-        context.device.CreateBindGroupLayout(&BGLayoutDesc);
-
-    wgpu::PipelineLayoutDescriptor pipelineLayoutDesc = {};
-    pipelineLayoutDesc.bindGroupLayoutCount = 1;
-    pipelineLayoutDesc.bindGroupLayouts = &BGLayout;
-    wgpu::PipelineLayout pipelineLayout =
-        context.device.CreatePipelineLayout(&pipelineLayoutDesc);
-
-    std::vector<wgpu::BindGroupEntry> BGEntries(1);
-    BGEntries[0].binding = 0;
-    BGEntries[0].buffer = uniformBuffer;
-    BGEntries[0].offset = 0;
-    BGEntries[0].size = sizeof(c2::render::Uniforms);
-
-    wgpu::BindGroupDescriptor BGDesc = {};
-    BGDesc.entryCount = BGEntries.size();
-    BGDesc.entries = BGEntries.data();
-    BGDesc.layout = BGLayout;
-    wgpu::BindGroup bindGroup = context.device.CreateBindGroup(&BGDesc);
-
-    // ============================================================================
-    // Texture settup
-    // ============================================================================
-
-    wgpu::ShaderModule shaderModule =
-        createShaderModule(context.device, c2::hard::shader1);
-
-    wgpu::TextureDescriptor imageTextureDesc = {};
-    imageTextureDesc.dimension = wgpu::TextureDimension::e2D;
-    imageTextureDesc.size = {windowData.targetConfig.width,
-                             windowData.targetConfig.height};
-    imageTextureDesc.usage = wgpu::TextureUsage::RenderAttachment |
-                             wgpu::TextureUsage::TextureBinding;
-    imageTextureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
-
-    wgpu::Texture imageTexture =
-        context.device.CreateTexture(&imageTextureDesc);
-    wgpu::TextureView imageView = imageTexture.CreateView();
-
-    // --- Render pipeline setup ---
-
-    wgpu::RenderPipelineDescriptor scenePipelineDesc = {};
-    scenePipelineDesc.depthStencil = nullptr;
-    scenePipelineDesc.layout = pipelineLayout;
-
-    scenePipelineDesc.vertex.buffers = nullptr;
-    scenePipelineDesc.vertex.bufferCount = 0;
-    scenePipelineDesc.vertex.module = shaderModule;
-    scenePipelineDesc.vertex.entryPoint = "scene_vs";
-
-    scenePipelineDesc.primitive.topology =
-        wgpu::PrimitiveTopology::TriangleList;
-    scenePipelineDesc.primitive.cullMode = wgpu::CullMode::None;
-    scenePipelineDesc.primitive.stripIndexFormat = wgpu::IndexFormat::Undefined;
-
-    scenePipelineDesc.primitive.frontFace = wgpu::FrontFace::CCW;
-    scenePipelineDesc.depthStencil = nullptr;
-    scenePipelineDesc.multisample.count = 1;
-    scenePipelineDesc.multisample.mask = 0xFFFFFFFF;
-    scenePipelineDesc.multisample.alphaToCoverageEnabled = false;
-
-    wgpu::FragmentState sceneFragmentState = {};
-    sceneFragmentState.module = shaderModule;
-    sceneFragmentState.entryPoint = "scene_fs";
-    sceneFragmentState.targetCount = 1;
-    wgpu::ColorTargetState sceneColorTarget = {};
-    sceneColorTarget.format = wgpu::TextureFormat::RGBA8Unorm;
-    sceneFragmentState.targets = &sceneColorTarget;
-    scenePipelineDesc.fragment = &sceneFragmentState;
-
-    wgpu::RenderPipeline scenePipeline =
-        context.device.CreateRenderPipeline(&scenePipelineDesc);
+    c2::render::setupRenderpass(rendererState, context, windowData);
 
     // ============================================================================
     // Audio settings
@@ -226,8 +51,6 @@ int main(int argc, char** argv) {
 
     c2::audio::PlayerState player{};
     player.volume = 1.0f;
-    // Add your actual file paths here. Duration is filled after loading a
-    // track.
 
     player.playlist.tracks = c2::audio::scanDirectory(
         "music");  // TODO: Change config from .toml or .json
@@ -249,14 +72,10 @@ int main(int argc, char** argv) {
     C2Core::Time::Context* timeCtx = C2Core::Time::create(60, 60);
     double targetFPS = 120;
 
-    int running = 1;
-    c2::audio::PlayerViewData viewData{};
-    std::vector<c2::audio::Command> commandQueue;
-
     while (running) {
         C2Core::Time::startFrame(timeCtx);
         C2Core::Time::setTargetFPS(timeCtx, targetFPS);
-        bool success = pollEvent(running, windowData);
+        bool success = c2::platform::pollEvent(running, windowData);
         context.instance.ProcessEvents();
 
         ImGui_ImplWGPU_NewFrame();
@@ -268,16 +87,12 @@ int main(int argc, char** argv) {
         const ImGuiID dockspaceID =
             ImGui::DockSpaceOverViewport(0, nullptr, dockspace_flags);
 
-        if (show_demo_window) {
-            // ImGui::ShowDemoWindow(&show_demo_window);
-        }
-
         c2::audio::updatePlayerViewData(player, viewData);
 
         c2::render::Uniforms un;
         un.pcmFrames = viewData.positionSeconds;
 
-        context.queue.WriteBuffer(uniformBuffer, 0, &un,
+        context.queue.WriteBuffer(rendererState.uniformBuffer, 0, &un,
                                   sizeof(c2::render::Uniforms));
 
         wgpu::SurfaceTexture surfaceTexture = {};
@@ -287,7 +102,7 @@ int main(int argc, char** argv) {
         // --- For texture rendering ---
         wgpu::RenderPassDescriptor scenePassDesc = {};
         wgpu::RenderPassColorAttachment sceneColorAttachment = {};
-        sceneColorAttachment.view = imageView;
+        sceneColorAttachment.view = rendererState.offscreenTextureView;
         sceneColorAttachment.loadOp = wgpu::LoadOp::Clear;
         sceneColorAttachment.storeOp = wgpu::StoreOp::Store;
         sceneColorAttachment.clearValue = wgpu::Color{0.0, 0.0, 0.0, 1.0};
@@ -309,46 +124,15 @@ int main(int argc, char** argv) {
         wgpu::RenderPassEncoder scenePass =
             encoder.BeginRenderPass(&scenePassDesc);
 
-        scenePass.SetPipeline(scenePipeline);
-        scenePass.SetBindGroup(0, bindGroup);
+        scenePass.SetPipeline(rendererState.offscreenPipeline);
+        scenePass.SetBindGroup(0, rendererState.bindGroup);
         scenePass.Draw(3);
         scenePass.End();
 
-        // RenderAnimatedMenu();
-
-        // DrawAnimatedCustomButton("daubi");
-
-        /*
-        static bool test = false;
-        AnimatedCheckbox("daubia", &test);
-        */
-        // firstTestWidget();
-        /*
-        ImGui::Begin("dasdsa");
-        HoverableText("dsaadsad");
-
-        ImGui::End();
-
-        */
-        DrawMusicPlayerUI(imageView, viewData, player, commandQueue,
-                          dockspaceID);
+        c2::ui::drawMusicPlayerUI(rendererState.offscreenTextureView, viewData,
+                                  player, uiState, commandQueue, dockspaceID);
 
         c2::audio::updatePlayer(player, commandQueue);
-        /*
-        ImGui::Begin("selectablebutton");
-        // shiftSelectableButton("test", "textt");
-
-        myButton("myButton", ImVec2(200.f, 200.f), ImColor(134, 24, 100, 255),
-                 ImColor(200, 160, 23, 255), ImColor(146, 23, 64, 255), 10.f);
-
-        * if (ImGui::IsItemHovered()) {
-            ImGui::Button("asdad");
-            shiftText("shift");
-        } */
-
-        // shiftText("asdad");
-
-        // ImGui::End();
 
         ImGui::Render();
 

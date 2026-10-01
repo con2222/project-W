@@ -3,9 +3,11 @@
 #include <SDL3/SDL.h>
 #include <webgpu/webgpu_cpp.h>
 
-namespace c2 {
+namespace c2::gpu {
+struct GPUContext;
+}
 
-struct gpu::GPUContext;
+namespace c2::platform {
 
 struct WindowData {
     SDL_Window* window = nullptr;
@@ -19,9 +21,10 @@ struct WindowData {
     wgpu::SurfaceConfiguration targetConfig;
 };
 
-WindowData createWindow(gpu::GPUContext ctx);
+WindowData createWindow(c2::gpu::GPUContext ctx);
 void syncFromWindow(WindowData& data);
 bool isSameConfig(const wgpu::SurfaceConfiguration& a,
                   const wgpu::SurfaceConfiguration& b);
+bool pollEvent(int& running, WindowData& data);
 
-}  // namespace c2
+}  // namespace c2::platform
