@@ -62,6 +62,8 @@ void setupRenderpass(RendererState& state, const c2::gpu::GPUContext& context,
 
     state.allocatedWidth = data.targetConfig.width;
     state.allocatedHeight = data.targetConfig.height;
+    state.activeViewportWidth = data.targetConfig.width;
+    state.activeViewportHeight = data.targetConfig.height;
 
     state.offscreenTexture = context.device.CreateTexture(&imageTextureDesc);
     state.offscreenTextureView = state.offscreenTexture.CreateView();
@@ -100,4 +102,25 @@ void setupRenderpass(RendererState& state, const c2::gpu::GPUContext& context,
     state.offscreenPipeline =
         context.device.CreateRenderPipeline(&scenePipelineDesc);
 }
+
+void recreateTexture(RendererState& state, const wgpu::Device& device,
+                     uint32_t width, uint32_t height) {
+    wgpu::TextureDescriptor textureDesc = {};
+    textureDesc.dimension = wgpu::TextureDimension::e2D;
+    textureDesc.size = {width, height};
+    textureDesc.usage = wgpu::TextureUsage::RenderAttachment |
+                        wgpu::TextureUsage::TextureBinding;
+    textureDesc.format = wgpu::TextureFormat::RGBA8Unorm;
+
+    state.offscreenTexture = device.CreateTexture(&textureDesc);
+    state.offscreenTextureView = state.offscreenTexture.CreateView();
+
+    state.allocatedWidth = width;
+    state.allocatedHeight = height;
+}
+
+bool isSameSize(RendererState& state, uint32_t width, uint32_t height) {
+    return state.allocatedHeight == height && state.allocatedWidth == width;
+}
+
 }  // namespace c2::render

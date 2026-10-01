@@ -1,3 +1,5 @@
+#include <cassert>
+#include <concepts>
 #include <string>
 #include <webgpu_utils.hpp>
 

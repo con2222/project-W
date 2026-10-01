@@ -78,6 +78,7 @@ fn scene_fs(
 inline const char* shader1 = R"(
 struct Uniforms {
     pcmFrames: f32,
+    resolution: vec2f,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -104,10 +105,9 @@ fn scene_vs(@builtin(vertex_index) idx: u32) -> SceneVSOutput {
 fn scene_fs(
     @builtin(position) fragCoord: vec4f
 ) -> @location(0) vec4f {
-    let resolution = vec2f(1920.0, 1080.0);
     
-    var uv = (fragCoord.xy / resolution) * 2.0 - vec2f(1.0, 1.0);    
-    uv.x *= resolution.x / resolution.y;
+    var uv = (fragCoord.xy / uniforms.resolution.xy) * 2.0 - vec2f(1.0, 1.0);    
+    uv.x *= uniforms.resolution.x / uniforms.resolution.y;
     let time = uniforms.pcmFrames;
     let d = length(uv);
     

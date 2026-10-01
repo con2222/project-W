@@ -8,6 +8,12 @@
 #include <cmath>
 #include <player.hpp>
 
+namespace c2 {
+namespace render {
+struct RendererState;
+}
+}  // namespace c2
+
 namespace c2::ui {
 
 struct MusicPlayerUIState {
@@ -23,6 +29,7 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
                        const c2::audio::PlayerViewData& viewData,
                        c2::audio::PlayerState& player,
                        c2::ui::MusicPlayerUIState& uiState,
+                       c2::render::RendererState& rendererState,
                        std::vector<c2::audio::Command>& commandQueue,
                        ImGuiID dockspaceId = 0);
 

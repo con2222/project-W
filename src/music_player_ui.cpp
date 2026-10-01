@@ -6,6 +6,7 @@
 
 #include "audio.hpp"
 #include "imgui.h"
+#include "render.hpp"
 
 namespace c2::ui {
 int GetMaxCharactersThatFit(const char* text, float availableWidth) {
@@ -47,6 +48,7 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
                        const c2::audio::PlayerViewData& viewData,
                        c2::audio::PlayerState& player,
                        c2::ui::MusicPlayerUIState& uiState,
+                       c2::render::RendererState& rendererState,
                        std::vector<c2::audio::Command>& commandQueue,
                        ImGuiID dockspaceId) {
     c2::audio::PlayerViewData current = viewData;
@@ -196,8 +198,15 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
             const ImVec2 available = ImGui::GetContentRegionAvail();
             const ImVec2 size((std::max)(1.0f, available.x),
                               (std::max)(1.0f, available.y));
+            rendererState.activeViewportWidth = size.x;
+            rendererState.activeViewportHeight = size.y;
 
-            ImGui::Image((ImTextureID)(std::intptr_t)imageView.Get(), size);
+            ImGui::Image((ImTextureID)(std::intptr_t)imageView.Get(), size,
+                         ImVec2(0.f, 0.f),
+                         ImVec2(rendererState.activeViewportWidth /
+                                    (float)(rendererState.allocatedWidth),
+                                rendererState.activeViewportHeight /
+                                    (float)rendererState.allocatedHeight));
         }
         ImGui::EndChild();
 

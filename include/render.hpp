@@ -17,7 +17,8 @@ namespace c2::render {
 
 struct Uniforms {
     float pcmFrames;
-    float padding[3];
+    float padding;
+    float resolution[2];
 };
 
 struct RendererState {
@@ -29,11 +30,11 @@ struct RendererState {
     wgpu::Texture offscreenTexture;
     wgpu::TextureView offscreenTextureView;
 
-    int allocatedWidth;
-    int allocatedHeight;
+    uint32_t allocatedWidth;
+    uint32_t allocatedHeight;
 
-    int activeViewportWidth;
-    int activeViewportHeight;
+    uint32_t activeViewportWidth;
+    uint32_t activeViewportHeight;
 
     wgpu::TextureFormat format;
     wgpu::ShaderModule module;
@@ -41,5 +42,9 @@ struct RendererState {
 
 void setupRenderpass(RendererState& state, const c2::gpu::GPUContext& context,
                      const c2::platform::WindowData& data);
+
+bool isSameSize(RendererState& state, uint32_t width, uint32_t height);
+void recreateTexture(RendererState& state, const wgpu::Device& device,
+                     uint32_t width, uint32_t height);
 
 }  // namespace c2::render
