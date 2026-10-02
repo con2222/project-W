@@ -40,11 +40,14 @@ struct RendererState {
     wgpu::ShaderModule module;
 };
 
-void setupRenderpass(RendererState& state, const c2::gpu::GPUContext& context,
-                     const c2::platform::WindowData& data);
-
 bool isSameSize(RendererState& state, uint32_t width, uint32_t height);
 void recreateTexture(RendererState& state, const wgpu::Device& device,
                      uint32_t width, uint32_t height);
 
+void initRenderer(RendererState& state, const c2::gpu::GPUContext& context,
+                  const c2::platform::WindowData& data);
+void updateRenderer(RendererState& state, const c2::gpu::GPUContext& ctx,
+                    float positionSeconds);
+void renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
+                 const c2::platform::WindowData& windowData);
 }  // namespace c2::render

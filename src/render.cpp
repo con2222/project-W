@@ -1,3 +1,6 @@
+#include <backends/imgui_impl_wgpu.h>
+
+#include <C2Core/c2_log.hpp>
 #include <hardcode.hpp>
 #include <render.hpp>
 #include <webgpu_context.hpp>
@@ -5,8 +8,8 @@
 #include <window.hpp>
 
 namespace c2::render {
-void setupRenderpass(RendererState& state, const c2::gpu::GPUContext& context,
-                     const c2::platform::WindowData& data) {
+void initRenderer(RendererState& state, const c2::gpu::GPUContext& context,
+                  const c2::platform::WindowData& data) {
     wgpu::BufferDescriptor uniformBufferDesc = {};
     uniformBufferDesc.mappedAtCreation = false;
     uniformBufferDesc.size = sizeof(c2::render::Uniforms);
@@ -121,6 +124,79 @@ void recreateTexture(RendererState& state, const wgpu::Device& device,
 
 bool isSameSize(RendererState& state, uint32_t width, uint32_t height) {
     return state.allocatedHeight == height && state.allocatedWidth == width;
+}
+
+void updateRenderer(RendererState& state, const c2::gpu::GPUContext& ctx,
+                    float positionSeconds) {
+    uint32_t alignViewportWidth =
+        c2::utils::align_up<uint32_t>(state.activeViewportWidth, 64);
+    uint32_t alignViewportHeight =
+        c2::utils::align_up<uint32_t>(state.activeViewportHeight, 64);
+
+    if (!isSameSize(state, alignViewportWidth, alignViewportHeight)) {
+        C2Core::Log::info(
+            "Resize texture: allocated width %d %d / active viewport %d %d",
+            state.allocatedWidth, state.allocatedHeight,
+            state.activeViewportWidth, state.activeViewportHeight);
+        recreateTexture(state, ctx.device, alignViewportWidth,
+                        alignViewportHeight);
+    }
+
+    Uniforms un{};
+    un.pcmFrames = positionSeconds;
+    un.resolution[0] = static_cast<float>(state.activeViewportWidth);
+    un.resolution[1] = static_cast<float>(state.activeViewportHeight);
+
+    ctx.queue.WriteBuffer(state.uniformBuffer, 0, &un, sizeof(Uniforms));
+}
+
+void renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
+                 const c2::platform::WindowData& windowData) {
+    wgpu::SurfaceTexture surfaceTexture = {};
+    windowData.surface.GetCurrentTexture(&surfaceTexture);
+    wgpu::TextureView view = surfaceTexture.texture.CreateView();
+
+    wgpu::CommandEncoder encoder = ctx.device.CreateCommandEncoder();
+
+    // --- 1. Offscreen rendering ---
+    wgpu::RenderPassColorAttachment sceneColorAttachment = {};
+    sceneColorAttachment.view = state.offscreenTextureView;
+    sceneColorAttachment.loadOp = wgpu::LoadOp::Clear;
+    sceneColorAttachment.storeOp = wgpu::StoreOp::Store;
+    sceneColorAttachment.clearValue = wgpu::Color{0.0, 0.0, 0.0, 1.0};
+
+    wgpu::RenderPassDescriptor scenePassDesc = {};
+    scenePassDesc.colorAttachmentCount = 1;
+    scenePassDesc.colorAttachments = &sceneColorAttachment;
+
+    wgpu::RenderPassEncoder scenePass = encoder.BeginRenderPass(&scenePassDesc);
+    scenePass.SetViewport(0, 0, state.activeViewportWidth,
+                          state.activeViewportHeight, 0.0f, 1.0f);
+    scenePass.SetScissorRect(0, 0, state.activeViewportWidth,
+                             state.activeViewportHeight);
+    scenePass.SetPipeline(state.offscreenPipeline);
+    scenePass.SetBindGroup(0, state.bindGroup);
+    scenePass.Draw(3);
+    scenePass.End();
+
+    // --- 2. Window rendering (ImGui) ---
+    wgpu::RenderPassColorAttachment colorAttachment = {};
+    colorAttachment.view = view;
+    colorAttachment.loadOp = wgpu::LoadOp::Clear;
+    colorAttachment.storeOp = wgpu::StoreOp::Store;
+    colorAttachment.clearValue = wgpu::Color{1.0, 1.0, 1.0, 1.0};
+
+    wgpu::RenderPassDescriptor renderPassDescriptor = {};
+    renderPassDescriptor.colorAttachmentCount = 1;
+    renderPassDescriptor.colorAttachments = &colorAttachment;
+
+    wgpu::RenderPassEncoder pass =
+        encoder.BeginRenderPass(&renderPassDescriptor);
+    ImGui_ImplWGPU_RenderDrawData(ImGui::GetDrawData(), pass.Get());
+    pass.End();
+
+    wgpu::CommandBuffer commands = encoder.Finish();
+    ctx.queue.Submit(1, &commands);
 }
 
 }  // namespace c2::render
