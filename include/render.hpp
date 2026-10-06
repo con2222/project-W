@@ -8,16 +8,22 @@ namespace c2 {
 namespace gpu {
 struct GPUContext;
 }
+
 namespace platform {
 struct WindowData;
 }
+
+namespace audio {
+struct AudioAnalysisNode;
+}
+
 }  // namespace c2
 
 namespace c2::render {
 
 struct Uniforms {
-    float pcmFrames;
-    float padding;
+    float time;
+    float audioIntensity;
     float resolution[2];
 };
 
@@ -46,8 +52,9 @@ void recreateTexture(RendererState& state, const wgpu::Device& device,
 
 void initRenderer(RendererState& state, const c2::gpu::GPUContext& context,
                   const c2::platform::WindowData& data);
-void updateRenderer(RendererState& state, const c2::gpu::GPUContext& ctx,
-                    float positionSeconds);
+void updateRenderer(RendererState& state,
+                    c2::audio::AudioAnalysisNode& audioAnalysisnode,
+                    const c2::gpu::GPUContext& ctx, float deltaTime);
 void renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
                  const c2::platform::WindowData& windowData);
 }  // namespace c2::render

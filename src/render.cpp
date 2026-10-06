@@ -1,6 +1,7 @@
 #include <backends/imgui_impl_wgpu.h>
 
 #include <C2Core/c2_log.hpp>
+#include <audio.hpp>
 #include <hardcode.hpp>
 #include <render.hpp>
 #include <webgpu_context.hpp>
@@ -126,8 +127,9 @@ bool isSameSize(RendererState& state, uint32_t width, uint32_t height) {
     return state.allocatedHeight == height && state.allocatedWidth == width;
 }
 
-void updateRenderer(RendererState& state, const c2::gpu::GPUContext& ctx,
-                    float positionSeconds) {
+void updateRenderer(RendererState& state,
+                    c2::audio::AudioAnalysisNode& audioAnalysisnode,
+                    const c2::gpu::GPUContext& ctx, float deltaTime) {
     uint32_t alignViewportWidth =
         c2::utils::align_up<uint32_t>(state.activeViewportWidth, 64);
     uint32_t alignViewportHeight =
@@ -143,7 +145,9 @@ void updateRenderer(RendererState& state, const c2::gpu::GPUContext& ctx,
     }
 
     Uniforms un{};
-    un.pcmFrames = positionSeconds;
+    un.time = ImGui::GetTime();
+    un.audioIntensity =
+        c2::audio::computeAudioIntensity(audioAnalysisnode, deltaTime);
     un.resolution[0] = static_cast<float>(state.activeViewportWidth);
     un.resolution[1] = static_cast<float>(state.activeViewportHeight);
 

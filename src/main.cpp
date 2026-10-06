@@ -60,6 +60,18 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
+    if (c2::audio::initAudioAnalysisNode(player.audio) != MA_SUCCESS) {
+        C2Core::Log::error("Can't init autio analysis node");
+        return EXIT_FAILURE;
+    }
+
+    // TODO: Need other handle error
+    if (c2::audio::attachAudioAnalysisNodeToEngine(player.audio) !=
+        MA_SUCCESS) {
+        C2Core::Log::error("Can't attach audio analysis node to engine");
+        return EXIT_FAILURE;
+    }
+
     if (!player.playlist.tracks.empty()) {
         if (!c2::audio::selectTrack(player, 0)) {
             C2Core::Log::error("Failed to select initial track");
@@ -71,10 +83,12 @@ int main(int argc, char** argv) {
 
     C2Core::Time::Context* timeCtx = C2Core::Time::create(60, 60);
     double targetFPS = 120;
+    C2Core::Time::setTargetFPS(timeCtx, targetFPS);
 
     while (running) {
         C2Core::Time::startFrame(timeCtx);
-        C2Core::Time::setTargetFPS(timeCtx, targetFPS);
+        float deltaTime = C2Core::Time::getDeltaTime(timeCtx);
+
         bool success = c2::platform::pollEvent(running, windowData);
         context.instance.ProcessEvents();
 
@@ -88,8 +102,8 @@ int main(int argc, char** argv) {
             ImGui::DockSpaceOverViewport(0, nullptr, dockspace_flags);
 
         c2::audio::updatePlayerViewData(player, viewData);
-        c2::render::updateRenderer(rendererState, context,
-                                   viewData.positionSeconds);
+        c2::render::updateRenderer(
+            rendererState, player.audio.audioAnalysisNode, context, deltaTime);
 
         c2::ui::drawMusicPlayerUI(rendererState.offscreenTextureView, viewData,
                                   player, uiState, rendererState, commandQueue,
@@ -110,6 +124,8 @@ int main(int argc, char** argv) {
             ImGui::UpdatePlatformWindows();
             ImGui::RenderPlatformWindowsDefault();
         }
+
+        std::cout << ImGui::GetIO().Framerate << '\n';
 
         C2Core::Time::endFrame(timeCtx, C2Core::Time::WaitMode::Hybrid);
     }

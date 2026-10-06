@@ -77,7 +77,8 @@ fn scene_fs(
 
 inline const char* shader1 = R"(
 struct Uniforms {
-    pcmFrames: f32,
+    time: f32,
+    audioIntensity: f32,
     resolution: vec2f,
 };
 
@@ -108,23 +109,35 @@ fn scene_fs(
     
     var uv = (fragCoord.xy / uniforms.resolution.xy) * 2.0 - vec2f(1.0, 1.0);    
     uv.x *= uniforms.resolution.x / uniforms.resolution.y;
-    let time = uniforms.pcmFrames;
+    let time = uniforms.time;
     let d = length(uv);
+
+    let dAudio = d - uniforms.audioIntensity * 0.15;
     
     // Вычисляем угол для создания спиральных или радиальных искажений
     let angle = atan2(uv.y, uv.x);
 
     // Создаем расходящиеся кольца
-    let rings = sin(d * 10.0 - time * 4.0);
+    // let rings = sin(d * 10.0 - time * 4.0);
+
+    // let rings = sin(d * (10.0 + uniforms.audioIntensity * 12.0) - time * 4.0);
+
+    let rings = sin(dAudio * 10.0 - time * 4.0);
     
     // Добавляем искажение волной по кругу
-    let wave = sin(angle * 4.0 + time * 2.0) * 0.2;
+    //let wave = sin(angle * 4.0 + time * 2.0) * 0.2;
+
+    let wave =
+    sin(angle * 4.0 + time * 2.0) * (0.2 + uniforms.audioIntensity * 0.5);
     
     // Высчитываем толщину и яркость колец (эффект свечения)
-    let glow = 0.05 / abs(rings + wave);
+   let glow = (0.05 + uniforms.audioIntensity * 0.15) / abs(rings + wave);
 
     // Динамически меняем цвета с течением времени и расстояния
     let r = 0.5 + 0.5 * sin(time + d * 3.0);
+
+    //let r = (0.5 + 0.5 * sin(time + d * 3.0)) * (0.5 + uniforms.audioIntensity);
+
     let g = 0.2 + 0.2 * sin(time * 1.5 + angle);
     let b = 0.5 + 0.5 * cos(time * 0.8 - d * 5.0);
 

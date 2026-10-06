@@ -1,13 +1,27 @@
 #pragma once
 #include <miniaudio.h>
 
+#include <atomic>
+#include <cmath>
 #include <string>
 
 namespace c2::audio {
 
+struct AudioAnalysisNode {
+    ma_node_base base;
+    ma_uint32 channels = 1;
+
+    float attackTime = 0.02f;
+    float releaseTime = 0.3f;
+
+    std::atomic<float> rms = 0.f;
+    std::atomic<float> peak = 0.f;
+};
+
 struct AudioState {
     ma_engine* engine = nullptr;
     ma_sound sound{};
+    AudioAnalysisNode audioAnalysisNode;
     bool hasSound = false;
 };
 
@@ -28,6 +42,11 @@ struct PlayerViewData {
     ma_uint64 durationFrames = 0;
 };
 
+template <typename T>
+T amplitudeToDbfs(T value) {
+    return 20 * std::log10(value);
+}
+
 ma_result initAudio(AudioState& audio);
 void shutdownAudio(AudioState& audio);
 ma_result loadSoundFromFile(AudioState& audio, const std::string& filename);
@@ -42,5 +61,14 @@ bool isSoundAtEnd(AudioState& audio);
 void setSoundVolume(AudioState& audio, float volumeValue);
 float getSoundVolume(AudioState& audio);
 void uninitSound(AudioState& audio);
+void processAudioAnalysisNode(ma_node* pNode, const float** ppFramesIn,
+                              ma_uint32* pFrameCountIn, float** ppFramesOut,
+                              ma_uint32* pFrameCountOut);
+
+ma_result initAudioAnalysisNode(AudioState& audio);
+ma_result attachAudioAnalysisNodeToEngine(AudioState& audio);
+ma_result attachAudioAnalysisNodeToSound(AudioState& audio);
+
+float computeAudioIntensity(AudioAnalysisNode& node, float deltaTime);
 
 }  // namespace c2::audio

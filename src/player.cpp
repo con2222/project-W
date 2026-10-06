@@ -36,6 +36,13 @@ bool selectTrack(PlayerState& player, int index) {
         return false;
     }
 
+    result = attachAudioAnalysisNodeToSound(player.audio);
+    if (result != MA_SUCCESS) {
+        C2Core::Log::error(
+            "Can't attach audio analysis node to sound: %s (error %d)",
+            player.playlist.tracks[index].filepath.c_str(), result);
+    }
+
     result = getSoundFormat(player.audio, player.soundAudioFormat);
     if (result == MA_SUCCESS) {
         result = getLengthPCMFrames(player.audio, player.durationFrames);
