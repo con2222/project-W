@@ -53,6 +53,7 @@ set(SOURCES
     src/player.cpp
     src/command.cpp
     src/imgui_layer.cpp
+    src/app.cpp
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})

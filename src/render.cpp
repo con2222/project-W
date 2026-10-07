@@ -130,20 +130,6 @@ bool isSameSize(RendererState& state, uint32_t width, uint32_t height) {
 void updateRenderer(RendererState& state,
                     c2::audio::AudioAnalysisNode& audioAnalysisnode,
                     const c2::gpu::GPUContext& ctx, float deltaTime) {
-    uint32_t alignViewportWidth =
-        c2::utils::align_up<uint32_t>(state.activeViewportWidth, 64);
-    uint32_t alignViewportHeight =
-        c2::utils::align_up<uint32_t>(state.activeViewportHeight, 64);
-
-    if (!isSameSize(state, alignViewportWidth, alignViewportHeight)) {
-        C2Core::Log::info(
-            "Resize texture: allocated width %d %d / active viewport %d %d",
-            state.allocatedWidth, state.allocatedHeight,
-            state.activeViewportWidth, state.activeViewportHeight);
-        recreateTexture(state, ctx.device, alignViewportWidth,
-                        alignViewportHeight);
-    }
-
     Uniforms un{};
     un.time = ImGui::GetTime();
     un.audioIntensity =
@@ -154,10 +140,34 @@ void updateRenderer(RendererState& state,
     ctx.queue.WriteBuffer(state.uniformBuffer, 0, &un, sizeof(Uniforms));
 }
 
-void renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
+void prepareViewport(RendererState& state, const wgpu::Device& device,
+                     uint32_t width, uint32_t height) {
+    state.activeViewportWidth = width;
+    state.activeViewportHeight = height;
+    uint32_t alignViewportWidth =
+        c2::utils::align_up<uint32_t>(state.activeViewportWidth, 64);
+    uint32_t alignViewportHeight =
+        c2::utils::align_up<uint32_t>(state.activeViewportHeight, 64);
+
+    if (!isSameSize(state, alignViewportWidth, alignViewportHeight)) {
+        C2Core::Log::info(
+            "Resize texture: allocated width %d %d / active viewport %d %d",
+            state.allocatedWidth, state.allocatedHeight,
+            state.activeViewportWidth, state.activeViewportHeight);
+        recreateTexture(state, device, alignViewportWidth, alignViewportHeight);
+    }
+}
+
+bool renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
                  const c2::platform::WindowData& windowData) {
     wgpu::SurfaceTexture surfaceTexture = {};
     windowData.surface.GetCurrentTexture(&surfaceTexture);
+
+    if (!surfaceTexture.texture) {
+        C2_ERROR("Can't get surface texture");
+        return false;
+    }
+
     wgpu::TextureView view = surfaceTexture.texture.CreateView();
 
     wgpu::CommandEncoder encoder = ctx.device.CreateCommandEncoder();
@@ -201,6 +211,8 @@ void renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
 
     wgpu::CommandBuffer commands = encoder.Finish();
     ctx.queue.Submit(1, &commands);
+
+    return true;
 }
 
 }  // namespace c2::render

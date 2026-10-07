@@ -50,7 +50,7 @@ bool prevTrack(PlayerState& player);
 ma_result playTrack(PlayerState& player);
 ma_result pauseTrack(PlayerState& player);
 ma_result seekTrack(PlayerState& player, ma_uint64 frame);
-void setTrackVolume(PlayerState& player, double volume);
+void setTrackVolume(PlayerState& player, float volume);
 void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue);
 ma_uint64 convertSecondsToPSMFrames(const PlayerState& player, double seconds);
 

@@ -17,7 +17,18 @@ void syncFromWindow(WindowData& data) {
     data.targetConfig.height = std::max(1u, static_cast<uint32_t>(height));
 }
 
-WindowData createWindow(gpu::GPUContext ctx) {
+// TODO: Handle errors? Can create new func initWindow(gpu::GPUContext& ctx,
+// WindowData& data)
+
+// The checks are performed sequentially:
+// 1. SDL_CreateWindow() returned a non-null pointer. In case of an error, you
+// can retrieve the description using SDL_GetError(). (SDL Wiki)
+// 2. A non-empty Surface was successfully obtained.
+// 3. GetCapabilities() completed successfully.
+// 4. formatCount, alphaModeCount, and presentModeCount are greater than
+// zero—only after this condition is met are you allowed to access the elements
+// at index [0].
+WindowData createWindow(gpu::GPUContext& ctx) {
     SDL_Window* window =
         SDL_CreateWindow("Main", c2::hard::WINDOW_WIDTH,
                          c2::hard::WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
@@ -44,10 +55,61 @@ WindowData createWindow(gpu::GPUContext ctx) {
     data.targetConfig = config;
 
     syncFromWindow(data);  // set width and height
+    surface.Configure(&data.currentConfig);
 
     // TODO: assign presentModes, alphaModes, formats
 
     return data;
+}
+
+bool initWindow(WindowData& data, gpu::GPUContext& ctx) {
+    SDL_Window* window =
+        SDL_CreateWindow("Main", c2::hard::WINDOW_WIDTH,
+                         c2::hard::WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
+    if (window == nullptr) {
+        C2Core::Log::error("Can't initialize SDL window");
+        return false;
+    }
+    data.window = window;
+
+    wgpu::Surface surface = SDL_GetWGPUSurface(ctx.instance.Get(), window);
+    if (!surface) {
+        C2Core::Log::error("Can't get surface from OS");
+        return false;
+    }
+    data.surface = surface;
+
+    C2Core::Log::info("surface = %p", reinterpret_cast<void*>(surface.Get()));
+
+    wgpu::SurfaceCapabilities caps;
+    if (surface.GetCapabilities(ctx.adapter, &caps) != wgpu::Status::Success) {
+        C2Core::Log::error("Can't get surface capabilities");
+        return false;
+    }
+
+    if (caps.formatCount == 0 || caps.alphaModeCount == 0 ||
+        caps.presentModeCount == 0) {
+        C2Core::Log::error("Required surface capabilities are missing");
+        return false;
+    }
+
+    wgpu::SurfaceConfiguration config;
+    config.device = ctx.device;
+    config.usage = wgpu::TextureUsage::RenderAttachment;
+    config.format = caps.formats[0];
+    config.alphaMode = caps.alphaModes[0];
+    config.presentMode = caps.presentModes[0];
+    config.width = 0;
+    config.height = 0;
+
+    data.currentConfig = config;
+    data.targetConfig = config;
+
+    syncFromWindow(data);
+    data.surface.Configure(&data.targetConfig);
+    data.currentConfig = data.targetConfig;
+
+    return true;
 }
 
 bool isSameConfig(const wgpu::SurfaceConfiguration& a,

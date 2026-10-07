@@ -13,6 +13,7 @@ struct GPUContext {
 };
 
 GPUContext getGPUContext();
+bool initGPUContext(GPUContext& context);
 
 wgpu::Instance initInstance();
 wgpu::Adapter createAdapter(const wgpu::Instance& instance);

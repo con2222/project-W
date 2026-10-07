@@ -50,7 +50,7 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
                        c2::ui::MusicPlayerUIState& uiState,
                        c2::render::RendererState& rendererState,
                        std::vector<c2::audio::Command>& commandQueue,
-                       ImGuiID dockspaceId) {
+                       const wgpu::Device& device, ImGuiID dockspaceId) {
     c2::audio::PlayerViewData current = viewData;
     ensureCapacity(uiState, player.playlist.tracks.size());
 
@@ -198,15 +198,18 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
             const ImVec2 available = ImGui::GetContentRegionAvail();
             const ImVec2 size((std::max)(1.0f, available.x),
                               (std::max)(1.0f, available.y));
-            rendererState.activeViewportWidth = size.x;
-            rendererState.activeViewportHeight = size.y;
 
-            ImGui::Image((ImTextureID)(std::intptr_t)imageView.Get(), size,
-                         ImVec2(0.f, 0.f),
-                         ImVec2(rendererState.activeViewportWidth /
-                                    (float)(rendererState.allocatedWidth),
-                                rendererState.activeViewportHeight /
-                                    (float)rendererState.allocatedHeight));
+            c2::render::prepareViewport(rendererState, device,
+                                        static_cast<uint32_t>(size.x),
+                                        static_cast<uint32_t>(size.y));
+
+            ImGui::Image(
+                (ImTextureID)(std::intptr_t)imageView.Get(), size,
+                ImVec2(0.f, 0.f),
+                ImVec2(rendererState.activeViewportWidth /
+                           static_cast<float>(rendererState.allocatedWidth),
+                       rendererState.activeViewportHeight /
+                           static_cast<float>(rendererState.allocatedHeight)));
         }
         ImGui::EndChild();
 
@@ -267,9 +270,13 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
             "##position", &position, 0.0f, current.durationSeconds, "",
             ImGuiSliderFlags_AlwaysClamp);
 
-        if (ImGui::IsItemActive()) {
-            commandQueue.emplace_back(
-                c2::audio::Command{.command = c2::audio::CommandType::Pause});
+        if (ImGui::IsItemActivated()) {
+            uiState.isMusicPlay = current.isPlaying;
+
+            if (uiState.isMusicPlay) {
+                commandQueue.emplace_back(c2::audio::Command{
+                    .command = c2::audio::CommandType::Pause});
+            }
         }
 
         if (currentDurationChanged) {
@@ -280,8 +287,12 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
         }
 
         if (ImGui::IsItemDeactivated()) {
-            commandQueue.emplace_back(
-                c2::audio::Command{.command = c2::audio::CommandType::Play});
+            if (uiState.isMusicPlay) {
+                commandQueue.emplace_back(c2::audio::Command{
+                    .command = c2::audio::CommandType::Play});
+            }
+
+            uiState.isMusicPlay = false;
         }
 
         ImGui::EndDisabled();

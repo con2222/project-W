@@ -134,7 +134,7 @@ ma_result initAudioAnalysisNode(AudioState& audio) {
     vtableNode.inputBusCount = 1;
     vtableNode.outputBusCount = 1;
     vtableNode.onGetRequiredInputFrameCount = nullptr;
-    vtableNode.flags = 0;
+    vtableNode.flags = MA_NODE_FLAG_CONTINUOUS_PROCESSING;
 
     ma_node_config nodeConfig = ma_node_config_init();
     nodeConfig.vtable = &vtableNode;
@@ -143,7 +143,11 @@ ma_result initAudioAnalysisNode(AudioState& audio) {
 
     result =
         ma_node_init(nodeGraph, &nodeConfig, nullptr, &audio.audioAnalysisNode);
-    audio.audioAnalysisNode.channels = channels;
+
+    if (result == MA_SUCCESS) {
+        audio.audioAnalysisNode.channels = channels;
+        audio.analysisNodeInitialized = true;
+    }
 
     return result;
 }

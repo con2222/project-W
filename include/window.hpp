@@ -21,10 +21,11 @@ struct WindowData {
     wgpu::SurfaceConfiguration targetConfig;
 };
 
-WindowData createWindow(c2::gpu::GPUContext ctx);
+WindowData createWindow(c2::gpu::GPUContext& ctx);
 void syncFromWindow(WindowData& data);
 bool isSameConfig(const wgpu::SurfaceConfiguration& a,
                   const wgpu::SurfaceConfiguration& b);
 bool pollEvent(int& running, WindowData& data);
+bool initWindow(WindowData& data, gpu::GPUContext& ctx);
 
 }  // namespace c2::platform

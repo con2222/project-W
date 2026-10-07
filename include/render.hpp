@@ -55,6 +55,9 @@ void initRenderer(RendererState& state, const c2::gpu::GPUContext& context,
 void updateRenderer(RendererState& state,
                     c2::audio::AudioAnalysisNode& audioAnalysisnode,
                     const c2::gpu::GPUContext& ctx, float deltaTime);
-void renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
+bool renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,
                  const c2::platform::WindowData& windowData);
+
+void prepareViewport(RendererState& state, const wgpu::Device& device,
+                     uint32_t width, uint32_t height);
 }  // namespace c2::render

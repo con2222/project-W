@@ -23,6 +23,7 @@ struct AudioState {
     ma_sound sound{};
     AudioAnalysisNode audioAnalysisNode;
     bool hasSound = false;
+    bool analysisNodeInitialized = false;
 };
 
 struct AudioFormatInfo {

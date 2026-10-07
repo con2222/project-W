@@ -13,6 +13,26 @@ GPUContext getGPUContext() {
     return context;
 }
 
+bool initGPUContext(GPUContext& context) {
+    context.instance = initInstance();
+    if (!context.instance) {
+        return false;
+    }
+
+    context.adapter = createAdapter(context.instance);
+    if (!context.adapter) {
+        return false;
+    }
+
+    context.device = createDevice(context.instance, context.adapter);
+    if (!context.device) {
+        return false;
+    }
+
+    context.queue = context.device.GetQueue();
+    return context.queue != nullptr;
+}
+
 wgpu::Instance initInstance() {
     // Init instance
     static constexpr auto kTimedWaitAny =
@@ -35,7 +55,8 @@ wgpu::Adapter createAdapter(const wgpu::Instance& instance) {
                               wgpu::Adapter adapter, wgpu::StringView message,
                               void* userdata) {
         if (status != wgpu::RequestAdapterStatus::Success) {
-            C2Core::Log::error("Failed to get an adapter: %s", message);
+            C2Core::Log::error("Failed to get an adapter: %.*s",
+                               static_cast<int>(message.length), message.data);
             return;
         }
         *static_cast<wgpu::Adapter*>(userdata) = adapter;
@@ -71,7 +92,8 @@ wgpu::Device createDevice(const wgpu::Instance& instance,
     deviceDescriptor.SetUncapturedErrorCallback([](const wgpu::Device&,
                                                    wgpu::ErrorType errorType,
                                                    wgpu::StringView message) {
-        C2Core::Log::error("%d error: %s", errorType, message);
+        C2Core::Log::error("%d error: %.*s", errorType,
+                           static_cast<int>(message.length), message.data);
         return;
     });  // error in runtime
 
@@ -81,7 +103,8 @@ wgpu::Device createDevice(const wgpu::Instance& instance,
                              wgpu::Device device, wgpu::StringView message,
                              void* userdata) {
         if (status != wgpu::RequestDeviceStatus::Success) {
-            C2Core::Log::error("Failed to get a device: %s", message.data);
+            C2Core::Log::error("Failed to get a device: %.*s",
+                               static_cast<int>(message.length), message.data);
             return;
         }
         *static_cast<wgpu::Device*>(userdata) = device;

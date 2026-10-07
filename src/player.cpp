@@ -89,42 +89,63 @@ std::vector<Track> scanDirectory(const std::string& directoryPath) {
     std::vector<Track> tracks;
     namespace fs = std::filesystem;
 
-    if (!fs::exists(directoryPath) || !fs::is_directory(directoryPath)) {
-        return tracks;
-    }
+    std::error_code scanError;
+    fs::directory_iterator it(directoryPath, scanError);
+    const fs::directory_iterator end;
 
-    for (const auto& entry : fs::directory_iterator(directoryPath)) {
-        if (entry.is_regular_file()) {
-            std::string ext = entry.path().extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(),
-                           [](unsigned char c) { return std::tolower(c); });
-            if (ext == ".mp3" || ext == ".wav" || ext == ".flac") {
-                TagLib::FileRef f(entry.path().string().c_str());
-                if (f.isNull()) {
-                    std::cerr << "Error: Failed to open the file or the format "
-                                 "is unsupported: "
-                              << entry.path().string() << '\n';
-                    continue;
-                }
-                if (f.tag()) {
-                    Track track;
-                    TagLib::Tag* tag = f.tag();
-                    track.filepath = entry.path().string();
-                    track.artist = tag->artist().to8Bit(true) != ""
-                                       ? tag->artist().to8Bit(true)
-                                       : "Undefined";
+    for (; !scanError && it != end; it.increment(scanError)) {
+        std::error_code fileError;
+        const bool isFile = it->is_regular_file(fileError);
 
-                    track.title = tag->title().to8Bit(true) != ""
-                                      ? tag->title().to8Bit(true)
-                                      : entry.path().filename().string();
+        if (fileError) {
+            C2Core::Log::error("File status error: %s",
+                               fileError.message().c_str());
+            continue;
+        }
 
+        if (!isFile) {
+            continue;
+        }
+
+        const auto& entry = *it;
+        std::string ext = entry.path().extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (ext == ".mp3" || ext == ".wav" || ext == ".flac") {
+            TagLib::FileRef f(entry.path().string().c_str());
+            if (f.isNull()) {
+                C2Core::Log::error(
+                    "Failed to open the file or the format is unsupported: "
+                    "%s",
+                    entry.path().string().c_str());
+                continue;
+            }
+            if (f.tag()) {
+                Track track;
+                TagLib::Tag* tag = f.tag();
+                track.filepath = entry.path().string();
+                track.artist = tag->artist().to8Bit(true) != ""
+                                   ? tag->artist().to8Bit(true)
+                                   : "Undefined";
+
+                track.title = tag->title().to8Bit(true) != ""
+                                  ? tag->title().to8Bit(true)
+                                  : entry.path().filename().string();
+
+                if (f.audioProperties() != nullptr) {
                     track.duration = f.audioProperties()->lengthInSeconds();
-
-                    tracks.push_back(track);
                 }
+
+                tracks.push_back(track);
             }
         }
     }
+
+    if (scanError) {
+        C2Core::Log::error("Directory scan error: ",
+                           scanError.message().c_str());
+    }
+
     return tracks;
 }
 

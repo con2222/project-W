@@ -2,16 +2,28 @@
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_wgpu.h>
 
+#include <C2Core/c2_log.hpp>
+#include <app.hpp>
 #include <imgui_layer.hpp>
 #include <webgpu_context.hpp>
 #include <window.hpp>
 
-void initImGui(c2::gpu::GPUContext& ctx, c2::platform::WindowData& data) {
+namespace c2 {
+
+bool initImGui(AppContext& app) {
     float main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
+
+    if (main_scale <= 0.0f) {
+        C2Core::Log::warning("Can't get UI scale: %s", SDL_GetError());
+        main_scale = 1.0f;
+    }
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    app.imguiContextInitialized = true;
+
     ImGuiIO& io = ImGui::GetIO();
+
     (void)io;
     io.ConfigFlags |=
         ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
@@ -32,13 +44,26 @@ void initImGui(c2::gpu::GPUContext& ctx, c2::platform::WindowData& data) {
                      // io.ConfigDpiScaleFonts=true automatically overrides this
                      // for every window depending on the current monitor)
 
-    ImGui_ImplSDL3_InitForOther(data.window);
+    if (!ImGui_ImplSDL3_InitForOther(app.window.window)) {
+        C2Core::Log::error("ImGui SDL3 backend initialization failed");
+        return false;
+    }
+    app.imguiSDLInitialized = true;
 
     ImGui_ImplWGPU_InitInfo init_info;
-    init_info.Device = ctx.device.Get();
+    init_info.Device = app.gpu.device.Get();
     init_info.NumFramesInFlight = 3;
     init_info.RenderTargetFormat =
-        static_cast<WGPUTextureFormat>(data.currentConfig.format);
+        static_cast<WGPUTextureFormat>(app.window.currentConfig.format);
     init_info.DepthStencilFormat = WGPUTextureFormat_Undefined;
-    ImGui_ImplWGPU_Init(&init_info);
+
+    if (!ImGui_ImplWGPU_Init(&init_info)) {
+        C2Core::Log::error("ImGui WGPU backend initialization failed");
+        return false;
+    }
+
+    app.imguiWGPUInitialized = true;
+    return true;
 }
+
+}  // namespace c2

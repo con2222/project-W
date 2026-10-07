@@ -21,6 +21,7 @@ struct MusicPlayerUIState {
     std::vector<int> counters;
     std::vector<float> textTimers;
     std::vector<float> scrollOffsets;
+    bool isMusicPlay = false;
 };
 
 void ensureCapacity(MusicPlayerUIState& state, size_t trackCount);
@@ -31,7 +32,7 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
                        c2::ui::MusicPlayerUIState& uiState,
                        c2::render::RendererState& rendererState,
                        std::vector<c2::audio::Command>& commandQueue,
-                       ImGuiID dockspaceId = 0);
+                       const wgpu::Device& device, ImGuiID dockspaceId = 0);
 
 int GetMaxCharactersThatFit(const char* text, float availableWidth);
 }  // namespace c2::ui
