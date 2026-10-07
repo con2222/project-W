@@ -41,6 +41,8 @@ bool selectTrack(PlayerState& player, int index) {
         C2Core::Log::error(
             "Can't attach audio analysis node to sound: %s (error %d)",
             player.playlist.tracks[index].filepath.c_str(), result);
+        uninitSound(player.audio);
+        return false;
     }
 
     result = getSoundFormat(player.audio, player.soundAudioFormat);
@@ -187,7 +189,22 @@ ma_result pauseTrack(PlayerState& player) {
 }
 
 bool nextTrack(PlayerState& player) {
+    if (player.playlist.tracks.empty()) {
+        return false;
+    }
+
+    if (player.playlist.tracks.size() == 1) {
+        return selectTrack(player, 0);
+    }
+
+    if (player.playlist.currentIndex < 0 ||
+        static_cast<std::size_t>(player.playlist.currentIndex) >=
+            player.playlist.tracks.size()) {
+        return false;
+    }
+
     int trackIndex = 0;
+
     if (player.params.isShuffle) {
         if (player.playlist.shufflePosition >=
             player.playlist.shuffleQueue.size()) {
@@ -197,6 +214,7 @@ bool nextTrack(PlayerState& player) {
         trackIndex =
             player.playlist.shuffleQueue[player.playlist.shufflePosition];
         player.playlist.shufflePosition++;
+
     } else {
         if (player.playlist.currentIndex + 1 < player.playlist.tracks.size()) {
             trackIndex = player.playlist.currentIndex + 1;
@@ -208,7 +226,16 @@ bool nextTrack(PlayerState& player) {
 }
 
 bool prevTrack(PlayerState& player) {
+    if (player.playlist.tracks.empty()) {
+        return false;
+    }
+
+    if (player.playlist.tracks.size() == 1) {
+        return selectTrack(player, 0);
+    }
+
     int trackIndex = 0;
+
     if (player.params.isShuffle) {
         int target = player.playlist.shufflePosition - 2;
         if (target < 0) {
@@ -316,35 +343,45 @@ void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue) {
 
     commandQueue.clear();
 
-    if (c2::audio::isSoundAtEnd(player.audio)) {
-        if (!player.params.isRepeat) {
-            if (!c2::audio::nextTrack(player)) {
-                C2Core::Log::error(
-                    "Failed to auto-switch to next track at the end of current "
-                    "track.");
-            }
-            ma_result result = playTrack(player);
-            if (result != MA_SUCCESS) {
-                C2Core::Log::error("Failed to play track: %d", result);
-            }
-        } else {
-            seekTrack(player, 0);
-            ma_result result = playTrack(player);
-            if (result != MA_SUCCESS) {
-                C2Core::Log::error("Failed to play track: %d", result);
+    if (player.audio.hasSound) {
+        if (c2::audio::isSoundAtEnd(player.audio)) {
+            if (!player.params.isRepeat) {
+                if (!c2::audio::nextTrack(player)) {
+                    C2Core::Log::error(
+                        "Failed to auto-switch to next track at the end of "
+                        "current "
+                        "track.");
+                }
+                ma_result result = playTrack(player);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to play track: %d", result);
+                }
+            } else {
+                seekTrack(player, 0);
+                ma_result result = playTrack(player);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to play track: %d", result);
+                }
             }
         }
     }
 }
 
 void generateShuffleQueue(PlayerState& player) {
-    if (player.params.isShuffle) {
-        auto& queue = player.playlist.shuffleQueue;
-        queue.resize(player.playlist.tracks.size());
-        std::iota(queue.begin(), queue.end(), 0);
-        std::swap(queue[0], queue[player.playlist.currentIndex]);
-        std::shuffle(queue.begin() + 1, queue.end(), player.playlist.rng);
+    auto& playlist = player.playlist;
+
+    if (!player.params.isShuffle || playlist.currentIndex < 0 ||
+        static_cast<std::size_t>(playlist.currentIndex) >=
+            playlist.tracks.size()) {
+        return;
     }
+
+    auto& queue = playlist.shuffleQueue;
+    queue.resize(playlist.tracks.size());
+
+    std::iota(queue.begin(), queue.end(), 0);
+    std::swap(queue[0], queue[playlist.currentIndex]);
+    std::shuffle(queue.begin() + 1, queue.end(), playlist.rng);
 }
 
 ma_uint64 convertSecondsToPSMFrames(const PlayerState& player, double seconds) {
