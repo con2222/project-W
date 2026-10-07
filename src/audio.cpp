@@ -37,13 +37,17 @@ ma_result loadSoundFromFile(AudioState& audio, const std::string& filename) {
 }
 
 ma_result playSound(AudioState& audio) {
-    ma_result result = ma_sound_start(&audio.sound);
-    return result;
+    if (!audio.hasSound) {
+        return MA_INVALID_OPERATION;
+    }
+    return ma_sound_start(&audio.sound);
 }
 
 ma_result pauseSound(AudioState& audio) {
-    ma_result result = ma_sound_stop(&audio.sound);
-    return result;
+    if (!audio.hasSound) {
+        return MA_INVALID_OPERATION;
+    }
+    return ma_sound_stop(&audio.sound);
 }
 
 ma_result getLengthPCMFrames(AudioState& audio, ma_uint64& outValue) {
@@ -60,6 +64,9 @@ ma_result getSoundFormat(AudioState& audio, AudioFormatInfo& outData) {
 }
 
 ma_result soundSeekToPCMFrame(AudioState& audio, ma_uint64 frameIndex) {
+    if (!audio.hasSound) {
+        return MA_INVALID_OPERATION;
+    }
     return ma_sound_seek_to_pcm_frame(&audio.sound, frameIndex);
 }
 

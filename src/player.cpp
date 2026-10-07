@@ -193,14 +193,14 @@ bool nextTrack(PlayerState& player) {
         return false;
     }
 
-    if (player.playlist.tracks.size() == 1) {
-        return selectTrack(player, 0);
-    }
-
     if (player.playlist.currentIndex < 0 ||
         static_cast<std::size_t>(player.playlist.currentIndex) >=
             player.playlist.tracks.size()) {
         return false;
+    }
+
+    if (player.playlist.tracks.size() == 1) {
+        return selectTrack(player, 0);
     }
 
     int trackIndex = 0;
@@ -211,10 +211,21 @@ bool nextTrack(PlayerState& player) {
             generateShuffleQueue(player);
             player.playlist.shufflePosition = 1;
         }
+
+        if (player.playlist.shufflePosition < 1 ||
+            static_cast<std::size_t>(player.playlist.shufflePosition) >=
+                player.playlist.shuffleQueue.size()) {
+            return false;
+        }
+
         trackIndex =
             player.playlist.shuffleQueue[player.playlist.shufflePosition];
-        player.playlist.shufflePosition++;
 
+        if (!selectTrack(player, trackIndex)) {
+            return false;
+        }
+        player.playlist.shufflePosition++;
+        return true;
     } else {
         if (player.playlist.currentIndex + 1 < player.playlist.tracks.size()) {
             trackIndex = player.playlist.currentIndex + 1;
@@ -230,6 +241,12 @@ bool prevTrack(PlayerState& player) {
         return false;
     }
 
+    if (player.playlist.currentIndex < 0 ||
+        static_cast<std::size_t>(player.playlist.currentIndex) >=
+            player.playlist.tracks.size()) {
+        return false;
+    }
+
     if (player.playlist.tracks.size() == 1) {
         return selectTrack(player, 0);
     }
@@ -237,12 +254,28 @@ bool prevTrack(PlayerState& player) {
     int trackIndex = 0;
 
     if (player.params.isShuffle) {
+        if (player.playlist.shuffleQueue.size() !=
+                player.playlist.tracks.size() ||
+            player.playlist.shuffleQueue.empty()) {
+            return false;
+        }
+
+        if (player.playlist.shufflePosition < 1 ||
+            static_cast<std::size_t>(player.playlist.shufflePosition) >
+                player.playlist.shuffleQueue.size()) {
+            return false;
+        }
+
         int target = player.playlist.shufflePosition - 2;
         if (target < 0) {
             target += player.playlist.shuffleQueue.size();
         }
         trackIndex = player.playlist.shuffleQueue[target];
+        if (!selectTrack(player, trackIndex)) {
+            return false;
+        }
         player.playlist.shufflePosition = target + 1;
+        return true;
     } else {
         if (player.playlist.currentIndex - 1 >= 0) {
             trackIndex = player.playlist.currentIndex - 1;
@@ -308,6 +341,11 @@ void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue) {
                 if (!selectTrack(player, cmd.index)) {
                     C2Core::Log::error("Failed to select track at index: %d",
                                        cmd.index);
+                    break;
+                }
+                if (player.params.isShuffle) {
+                    generateShuffleQueue(player);
+                    player.playlist.shufflePosition = 1;
                 }
                 break;
             }
@@ -347,20 +385,24 @@ void updatePlayer(PlayerState& player, std::vector<Command>& commandQueue) {
         if (c2::audio::isSoundAtEnd(player.audio)) {
             if (!player.params.isRepeat) {
                 if (!c2::audio::nextTrack(player)) {
-                    C2Core::Log::error(
-                        "Failed to auto-switch to next track at the end of "
-                        "current "
-                        "track.");
+                    C2Core::Log::error("Failed to auto-switch track");
+                    return;
                 }
                 ma_result result = playTrack(player);
                 if (result != MA_SUCCESS) {
                     C2Core::Log::error("Failed to play track: %d", result);
                 }
             } else {
-                seekTrack(player, 0);
-                ma_result result = playTrack(player);
+                ma_result result;
+                result = seekTrack(player, 0);
+                if (result != MA_SUCCESS) {
+                    C2Core::Log::error("Failed to rewind track: %d", result);
+                    return;
+                }
+                result = playTrack(player);
                 if (result != MA_SUCCESS) {
                     C2Core::Log::error("Failed to play track: %d", result);
+                    return;
                 }
             }
         }
