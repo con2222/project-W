@@ -25,6 +25,14 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(SDL3)
 
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG        v3.0.1
+)
+
+FetchContent_MakeAvailable(Catch2)
+
 find_package(Threads REQUIRED)
 find_package(Dawn REQUIRED)
 
@@ -43,8 +51,7 @@ add_subdirectory(vendor/taglib)
 
 add_subdirectory(vendor/miniaudio)
 
-set(SOURCES 
-    src/main.cpp
+set(CORE_SOURCES 
     src/webgpu_context.cpp
     src/window.cpp
     src/webgpu_utils.cpp
@@ -57,17 +64,20 @@ set(SOURCES
     src/app.cpp
 )
 
-add_executable(${PROJECT_NAME} ${SOURCES})
+add_library(audio-core STATIC ${CORE_SOURCES})
 
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib
-        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib/toolkit
-        ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib
+target_include_directories(audio-core
+PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib/toolkit
+    ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui tag miniaudio)
+target_link_libraries(audio-core PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui tag miniaudio)
+
+add_executable(${PROJECT_NAME} src/main.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE audio-core)
 
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
@@ -76,3 +86,11 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
     $<TARGET_FILE_DIR:${PROJECT_NAME}>
 )
 
+
+add_executable(audio-tests tests/test_shuffle.cpp)
+target_link_libraries(audio-tests PRIVATE audio-core Catch2::Catch2WithMain)
+
+list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+include(CTest)
+include(Catch)
+catch_discover_tests(audio-tests)
