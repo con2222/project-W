@@ -41,10 +41,11 @@ target_compile_definitions(imgui PRIVATE IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 add_subdirectory(vendor/taglib)
 
+add_subdirectory(vendor/miniaudio)
+
 set(SOURCES 
     src/main.cpp
     src/webgpu_context.cpp
-    src/miniaudio.c
     src/window.cpp
     src/webgpu_utils.cpp
     src/render.cpp
@@ -66,7 +67,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/vendor/taglib/taglib
 )
 
-target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui tag)
+target_link_libraries(${PROJECT_NAME} PUBLIC dawn::webgpu_dawn SDL3::SDL3 C2Core sdl3webgpu imgui tag miniaudio)
 
 
 add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD

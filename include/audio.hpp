@@ -1,9 +1,12 @@
 #pragma once
-#include <miniaudio.h>
 
 #include <atomic>
 #include <cmath>
 #include <string>
+
+extern "C" {
+#include <miniaudio.h>
+}
 
 namespace c2::audio {
 

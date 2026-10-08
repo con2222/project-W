@@ -11,22 +11,17 @@
 #include <app.hpp>
 #include <audio.hpp>
 #include <command.hpp>
+#include <cstdlib>
 #include <hardcode.hpp>
 #include <imgui_layer.hpp>
 #include <interfacetest.hpp>
+#include <iostream>
 #include <music_player_ui.hpp>
 #include <player.hpp>
 #include <render.hpp>
 #include <webgpu_context.hpp>
 #include <webgpu_utils.hpp>
 #include <window.hpp>
-
-extern "C" {
-#include <miniaudio.h>
-}
-
-#include <cstdlib>
-#include <iostream>
 
 int main(int argc, char** argv) {
     c2::AppContext app;
