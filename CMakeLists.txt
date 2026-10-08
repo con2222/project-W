@@ -87,7 +87,7 @@ add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
 )
 
 
-add_executable(audio-tests tests/test_shuffle.cpp)
+add_executable(audio-tests tests/test_player.cpp)
 target_link_libraries(audio-tests PRIVATE audio-core Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)

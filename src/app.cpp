@@ -47,11 +47,7 @@ bool initApp(AppContext& app) {
         return false;
     }
 
-    if (!app.player.playlist.tracks.empty()) {
-        if (!c2::audio::selectTrack(app.player, 0)) {
-            C2Core::Log::error("Failed to select initial track");
-        }
-    } else {
+    if (app.player.playlist.tracks.empty()) {
         C2Core::Log::warning(
             "Playlist is empty. No tracks found in directory.");
     }
