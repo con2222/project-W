@@ -19,6 +19,8 @@ struct AudioAnalysisNode {
 
     std::atomic<float> rms = 0.f;
     std::atomic<float> peak = 0.f;
+
+    float smoothed = 0.f;
 };
 
 struct AudioState {

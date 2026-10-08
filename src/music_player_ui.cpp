@@ -214,7 +214,8 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
         ImGui::EndChild();
 
         ImGui::Separator();
-        ImGui::BeginDisabled(player.playlist.tracks.empty());
+        ImGui::BeginDisabled(player.playlist.tracks.empty() ||
+                             player.playlist.currentIndex == -1);
         if (ImGui::Button("Previous", ImVec2(90, 0))) {
             commandQueue.emplace_back(
                 c2::audio::Command{.command = c2::audio::CommandType::Prev});
@@ -238,7 +239,8 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
         ImGui::EndDisabled();
         ImGui::SameLine();
 
-        ImGui::BeginDisabled(player.playlist.tracks.empty());
+        ImGui::BeginDisabled(player.playlist.tracks.empty() ||
+                             player.playlist.currentIndex == -1);
         if (ImGui::Button("Next", ImVec2(90, 0))) {
             c2::audio::Command cmd;
             cmd.command = c2::audio::CommandType::Next;
@@ -308,11 +310,9 @@ void drawMusicPlayerUI(wgpu::TextureView& imageView,
         float volume = current.volume * 100.0f;
         if (ImGui::SliderFloat("##volume", &volume, 0.0f, 100.0f, "%.0f%%",
                                ImGuiSliderFlags_AlwaysClamp)) {
-            if (player.audio.hasSound) {
-                commandQueue.emplace_back(c2::audio::Command{
-                    .command = c2::audio::CommandType::SetVolume,
-                    .volume = volume / 100.f});
-            }
+            commandQueue.emplace_back(
+                c2::audio::Command{.command = c2::audio::CommandType::SetVolume,
+                                   .volume = volume / 100.f});
         }
     }
     ImGui::End();  // Нужен даже при Begin() == false.

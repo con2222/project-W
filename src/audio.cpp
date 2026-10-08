@@ -166,22 +166,22 @@ ma_result attachAudioAnalysisNodeToSound(AudioState& audio) {
 }
 
 float computeAudioIntensity(AudioAnalysisNode& node, float deltaTime) {
-    static float smoothed = 0.f;
-
     float alphaAttack = 1 - std::exp(-deltaTime / node.attackTime);
     float alphaRelease = 1 - std::exp(-deltaTime / node.releaseTime);
 
     float currentRms = node.rms.load(std::memory_order_relaxed);
 
-    if (currentRms > smoothed) {
-        smoothed = smoothed + alphaAttack * (currentRms - smoothed);
+    if (currentRms > node.smoothed) {
+        node.smoothed =
+            node.smoothed + alphaAttack * (currentRms - node.smoothed);
     } else {
-        smoothed = smoothed + alphaRelease * (currentRms - smoothed);
+        node.smoothed =
+            node.smoothed + alphaRelease * (currentRms - node.smoothed);
     }
 
     float rmsDbfs;
-    if (smoothed > 1e-12) {
-        rmsDbfs = amplitudeToDbfs<float>(smoothed);
+    if (node.smoothed > 1e-12) {
+        rmsDbfs = amplitudeToDbfs<float>(node.smoothed);
     } else {
         rmsDbfs = -96.f;
     }

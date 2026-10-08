@@ -312,7 +312,9 @@ ma_result seekTrack(PlayerState& player, ma_uint64 frame) {
 }
 
 void setTrackVolume(PlayerState& player, float volume) {
-    c2::audio::setSoundVolume(player.audio, volume);
+    if (player.audio.hasSound) {
+        c2::audio::setSoundVolume(player.audio, volume);
+    }
     player.volume = volume;
 }
 
