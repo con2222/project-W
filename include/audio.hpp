@@ -20,6 +20,7 @@ struct AudioAnalysisNode {
     std::atomic<float> rms = 0.f;
     std::atomic<float> peak = 0.f;
 
+    ma_pcm_rb pcmRingBuffer;
     float smoothed = 0.f;
 };
 
@@ -76,5 +77,8 @@ ma_result attachAudioAnalysisNodeToEngine(AudioState& audio);
 ma_result attachAudioAnalysisNodeToSound(AudioState& audio);
 
 float computeAudioIntensity(AudioAnalysisNode& node, float deltaTime);
+
+ma_uint32 readAnalysisFrames(AudioAnalysisNode& node, float* framesOut,
+                             ma_uint32 frameCountOut);
 
 }  // namespace c2::audio

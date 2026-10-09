@@ -3,6 +3,7 @@
 
 #include <C2Core/c2_log.hpp>
 #include <app.hpp>
+#include <hardcode.hpp>
 #include <imgui_layer.hpp>
 
 namespace c2 {
@@ -65,6 +66,9 @@ int runApp(AppContext& app) {
 
     ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
 
+    std::vector<float> samples(app.player.audio.audioAnalysisNode.channels *
+                               c2::hard::RG_BUFFER_SIZE);
+
     while (running) {
         C2Core::Time::startFrame(app.timeCtx);
         float deltaTime = C2Core::Time::getDeltaTime(app.timeCtx);
@@ -89,6 +93,36 @@ int runApp(AppContext& app) {
             app.renderer.offscreenTextureView, app.viewData, app.player, app.ui,
             app.renderer, app.commandQueue, app.gpu.device, dockspaceID);
         c2::audio::updatePlayer(app.player, app.commandQueue);
+
+        ma_uint32 framesRead = c2::audio::readAnalysisFrames(
+            app.player.audio.audioAnalysisNode, samples.data(),
+            c2::hard::RG_BUFFER_SIZE);
+
+        float peak = 0.f;
+        if (framesRead != 0) {
+            for (int i = 0;
+                 i < framesRead * app.player.audio.audioAnalysisNode.channels;
+                 i++) {
+                float sample = samples[i];
+                peak = std::max(peak, std::abs(sample));
+            }
+            C2Core::Log::info("peak: %.2f", peak);
+        }
+
+        const ImGuiWindowFlags debugFlags =
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking;
+
+        if (ImGui::Begin("Audio analysis", nullptr, debugFlags)) {
+            ImGui::Text("Frames read: %u", static_cast<unsigned>(framesRead));
+
+            if (framesRead > 0) {
+                ImGui::Text("Peak: %.4f", peak);
+            } else {
+                ImGui::TextDisabled("No new samples");
+            }
+        }
+        ImGui::End();
+
         c2::render::updateRenderer(app.renderer,
                                    app.player.audio.audioAnalysisNode, app.gpu,
                                    deltaTime);

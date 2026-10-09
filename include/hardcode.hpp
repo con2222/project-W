@@ -20,6 +20,7 @@ constexpr const char* SHADER_TRIANGLE = R"(
 
 constexpr int WINDOW_WIDTH = 1920;
 constexpr int WINDOW_HEIGHT = 1080;
+constexpr unsigned int RG_BUFFER_SIZE = 8192;  // size in frames
 
 inline const char* shader = R"(
 

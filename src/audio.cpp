@@ -1,6 +1,7 @@
 #include <C2Core/c2_log.hpp>
 #include <algorithm>
 #include <audio.hpp>
+#include <hardcode.hpp>
 
 namespace c2::audio {
 
@@ -100,9 +101,38 @@ void processAudioAnalysisNode(ma_node* pNode, const float** ppFramesIn,
     AudioAnalysisNode* audioAnalysisNode =
         static_cast<AudioAnalysisNode*>(pNode);
 
+    int sampleCount = *pFrameCountOut * audioAnalysisNode->channels;
+
+    ma_result result;
+    void* rbPtr;
+    ma_uint32 remainingFrames = *pFrameCountIn;
+    ma_uint32 frameOffset = 0;
+
+    while (remainingFrames > 0) {
+        ma_uint32 framesToAcquire = remainingFrames;
+        result = ma_pcm_rb_acquire_write(&audioAnalysisNode->pcmRingBuffer,
+                                         &framesToAcquire, &rbPtr);
+        if (result != MA_SUCCESS || framesToAcquire == 0) {
+            break;
+        }
+
+        std::copy(pFramesIn_0 + frameOffset * audioAnalysisNode->channels,
+                  pFramesIn_0 + (frameOffset + framesToAcquire) *
+                                    audioAnalysisNode->channels,
+                  static_cast<float*>(rbPtr));
+        result = ma_pcm_rb_commit_write(&audioAnalysisNode->pcmRingBuffer,
+                                        framesToAcquire);
+
+        if (result != MA_SUCCESS) {
+            break;
+        }
+
+        remainingFrames -= framesToAcquire;
+        frameOffset += framesToAcquire;
+    }
+
     float peak = 0.f;
     float sumSamples = 0.f;
-    int sampleCount = *pFrameCountOut * audioAnalysisNode->channels;
 
     for (int i = 0; i < sampleCount; i++) {
         float sample = pFramesIn_0[i];
@@ -111,8 +141,11 @@ void processAudioAnalysisNode(ma_node* pNode, const float** ppFramesIn,
         pFramesOut_0[i] = sample;
     }
 
-    audioAnalysisNode->rms.store(std::sqrt(sumSamples / sampleCount),
-                                 std::memory_order_relaxed);
+    if (sampleCount != 0) {
+        audioAnalysisNode->rms.store(std::sqrt(sumSamples / sampleCount),
+                                     std::memory_order_relaxed);
+    }
+
     audioAnalysisNode->peak.store(peak, std::memory_order_relaxed);
 }
 
@@ -122,6 +155,10 @@ ma_result initAudioAnalysisNode(AudioState& audio) {
     ma_node_graph* nodeGraph = ma_engine_get_node_graph(audio.engine);
 
     ma_result result;
+
+    result = ma_pcm_rb_init(ma_format_f32, channels, c2::hard::RG_BUFFER_SIZE,
+                            nullptr, nullptr,
+                            &audio.audioAnalysisNode.pcmRingBuffer);
 
     ma_uint32 inputChannels[1];   // array size = input bus count;
     ma_uint32 outputChannels[1];  // array size = output bus count
@@ -188,6 +225,40 @@ float computeAudioIntensity(AudioAnalysisNode& node, float deltaTime) {
 
     float audioIntensity = std::clamp((rmsDbfs + 60.f) / 60.f, 0.f, 1.f);
     return audioIntensity;
+}
+
+ma_uint32 readAnalysisFrames(AudioAnalysisNode& node, float* framesOut,
+                             ma_uint32 frameCountOut) {
+    ma_result result;
+    ma_uint32 remainingFrames = frameCountOut;
+    ma_uint32 frameOffset = 0;
+
+    while (remainingFrames > 0) {
+        void* rgPtr;
+        ma_uint32 framesToAcquire = remainingFrames;
+        result = ma_pcm_rb_acquire_read(&node.pcmRingBuffer, &framesToAcquire,
+                                        &rgPtr);
+
+        if (result != MA_SUCCESS || framesToAcquire == 0) {
+            break;
+        }
+
+        const float* data = static_cast<float*>(rgPtr);
+
+        std::copy(data, data + framesToAcquire * node.channels,
+                  framesOut + frameOffset * node.channels);
+
+        result = ma_pcm_rb_commit_read(&node.pcmRingBuffer, framesToAcquire);
+
+        if (result != MA_SUCCESS) {
+            break;
+        }
+
+        remainingFrames -= framesToAcquire;
+        frameOffset += framesToAcquire;
+    }
+
+    return frameOffset;
 }
 
 }  // namespace c2::audio
