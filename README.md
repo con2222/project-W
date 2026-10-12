@@ -43,3 +43,8 @@ Dependencies must be installed or configured before building.
 **Work in Progress**
 
 This is a personal learning project. Features and architecture are actively evolving.
+
+## License
+
+This project is licensed under the MIT License.
+See [LICENSE](LICENSE) for details.
