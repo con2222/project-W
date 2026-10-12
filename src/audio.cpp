@@ -2,8 +2,11 @@
 #include <algorithm>
 #include <audio.hpp>
 #include <bit>
+#include <cmath>
+#include <complex>
 #include <hardcode.hpp>
 #include <numbers>
+#include <vector>
 
 namespace c2::audio {
 
@@ -263,11 +266,6 @@ ma_uint32 readAnalysisFrames(AudioAnalysisNode& node, float* framesOut,
     return frameOffset;
 }
 
-#include <cmath>
-#include <complex>
-#include <numbers>
-#include <vector>
-
 std::vector<std::complex<float>> dft(const std::vector<float>& samples) {
     const std::size_t N = samples.size();
     constexpr float pi = std::numbers::pi_v<float>;
@@ -288,9 +286,17 @@ std::vector<std::complex<float>> dft(const std::vector<float>& samples) {
     return result;
 }
 
+// Without hann window normalization = N.
+// Periodic Hann normalization = N / 2
+// Symetric Hann normalization = (N - 1) / 2, N >= 3
 std::vector<float> amplitudeSpectrum(
-    const std::vector<std::complex<float>>& spectrum) {
+    const std::vector<std::complex<float>>& spectrum, float normalization) {
     const std::size_t N = spectrum.size();
+
+    if (!(std::isfinite(normalization) && normalization > 0)) {
+        C2Core::Log::error("normalization <= 0 or isn't finite");
+        return {};
+    }
 
     if (N == 0) {
         return {};
@@ -300,9 +306,9 @@ std::vector<float> amplitudeSpectrum(
 
     for (std::size_t k = 0; k < result.size(); k++) {
         if (k == 0 || (N % 2 == 0 && k == N / 2)) {
-            result[k] = std::abs(spectrum[k]) / N;
+            result[k] = std::abs(spectrum[k]) / normalization;
         } else {
-            result[k] = std::abs(spectrum[k]) * 2.0f / N;
+            result[k] = std::abs(spectrum[k]) * 2.0f / normalization;
         }
     }
     return result;
@@ -359,6 +365,18 @@ std::vector<std::complex<float>> fft(const std::vector<float>& samples) {
     }
 
     return fft(complexSamples);
+}
+
+void applyHannWindow(std::vector<float>& samples) {
+    const std::size_t N = samples.size();
+
+    if (N < 2) {
+        return;
+    }
+    constexpr float pi = std::numbers::pi_v<float>;
+    for (std::size_t n = 0; n < N; ++n) {
+        samples[n] *= 0.5f * (1.f - std::cos(2.f * pi * n / N));
+    }
 }
 
 }  // namespace c2::audio

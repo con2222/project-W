@@ -85,9 +85,10 @@ ma_uint32 readAnalysisFrames(AudioAnalysisNode& node, float* framesOut,
 
 std::vector<std::complex<float>> dft(const std::vector<float>& samples);
 std::vector<std::complex<float>> fft(
-    const std::vector<std::complex<double>>& samples);
+    const std::vector<std::complex<float>>& samples);
 std::vector<std::complex<float>> fft(const std::vector<float>& samples);
 std::vector<float> amplitudeSpectrum(
-    const std::vector<std::complex<float>>& spectrum);
+    const std::vector<std::complex<float>>& spectrum, float normalization);
+void applyHannWindow(std::vector<float>& samples);
 
 }  // namespace c2::audio

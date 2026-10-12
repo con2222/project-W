@@ -69,7 +69,7 @@ int runApp(AppContext& app) {
     std::vector<float> samples(app.player.audio.audioAnalysisNode.channels *
                                c2::hard::RG_BUFFER_SIZE);
 
-    constexpr std::size_t analysisSize = 2048;
+    constexpr std::size_t analysisSize = 256;
     std::vector<float> analysisBlock(analysisSize);
     std::size_t filled = 0;
 
@@ -112,7 +112,6 @@ int runApp(AppContext& app) {
                 float sample = samples[i];
                 peak = std::max(peak, std::abs(sample));
             }
-            C2Core::Log::info("peak: %.2f", peak);
         }
 
         for (std::size_t i = 0; i < framesRead; i++) {
@@ -120,8 +119,9 @@ int runApp(AppContext& app) {
                 samples[i * app.player.audio.audioAnalysisNode.channels];
             filled++;
             if (filled == analysisSize) {
-                amplitudes =
-                    c2::audio::amplitudeSpectrum(c2::audio::fft(analysisBlock));
+                c2::audio::applyHannWindow(analysisBlock);
+                amplitudes = c2::audio::amplitudeSpectrum(
+                    c2::audio::fft(analysisBlock), analysisBlock.size() / 2.0f);
                 filled = 0;
             }
         }

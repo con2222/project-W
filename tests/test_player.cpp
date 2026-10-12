@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <command.hpp>
+#include <numbers>
 #include <player.hpp>
 #include <random>
 #include <ranges>
