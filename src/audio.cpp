@@ -76,6 +76,10 @@ ma_result soundSeekToPCMFrame(AudioState& audio, ma_uint64 frameIndex) {
     return ma_sound_seek_to_pcm_frame(&audio.sound, frameIndex);
 }
 
+ma_uint32 getEngineSampleRate(AudioState& audio) {
+    return ma_engine_get_sample_rate(audio.engine);
+}
+
 void uninitSound(AudioState& audio) {
     if (audio.hasSound) {
         ma_sound_uninit(&audio.sound);
@@ -286,7 +290,7 @@ std::vector<std::complex<float>> dft(const std::vector<float>& samples) {
     return result;
 }
 
-// Without hann window normalization = N.
+// Without Hann window normalization = N.
 // Periodic Hann normalization = N / 2
 // Symetric Hann normalization = (N - 1) / 2, N >= 3
 std::vector<float> amplitudeSpectrum(
@@ -379,4 +383,48 @@ void applyHannWindow(std::vector<float>& samples) {
     }
 }
 
+std::vector<float> spectrumToDb(const std::vector<float>& amplitudes) {
+    std::vector<float> result(amplitudes.size());
+    for (std::size_t i = 0; i < amplitudes.size(); ++i) {
+        result[i] = amplitudeToDbfs<float>(amplitudes[i]);
+    }
+    return result;
+}
+
+float binToFrequency(std::size_t bin, std::size_t fftSize, float sampleRate) {
+    if (fftSize == 0) {
+        return 0.0f;
+    }
+
+    if (bin > fftSize / 2) {
+        return (sampleRate / 2.0f);
+    }
+    return static_cast<float>(bin) * sampleRate / static_cast<float>(fftSize);
+}
+
+float bandPeak(const std::vector<float>& amplitudes, std::size_t fftSize,
+               float sampleRate, float minFrequency, float maxFrequency) {
+    float maxAmplitude = 0.f;
+
+    for (std::size_t i = 0; i < amplitudes.size(); ++i) {
+        float frequency = binToFrequency(i, fftSize, sampleRate);
+        if (frequency >= minFrequency && frequency < maxFrequency) {
+            maxAmplitude = std::max(amplitudes[i], maxAmplitude);
+        }
+    }
+    return maxAmplitude;
+}
+
+// attackTime = 0.02f ms
+// releaseTime = 0.2f ms
+float smoothEnvelope(float current, float target, float deltaTime,
+                     float attackTime, float releaseTime) {
+    float alpha = 0.f;
+    if (target > current) {
+        alpha = 1 - std::exp(-deltaTime / attackTime);
+    } else {
+        alpha = 1 - std::exp(-deltaTime / releaseTime);
+    }
+    return current + alpha * (target - current);
+}
 }  // namespace c2::audio

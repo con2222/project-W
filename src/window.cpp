@@ -57,7 +57,7 @@ WindowData createWindow(gpu::GPUContext& ctx) {
     syncFromWindow(data);  // set width and height
     surface.Configure(&data.currentConfig);
 
-    // TODO: assign presentModes, alphaModes, formats
+    // TODO: Assign presentModes, alphaModes, formats
 
     return data;
 }

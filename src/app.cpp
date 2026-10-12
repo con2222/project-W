@@ -66,14 +66,19 @@ int runApp(AppContext& app) {
 
     ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_PassthruCentralNode;
 
+    // TODO: Change hardcode values
     std::vector<float> samples(app.player.audio.audioAnalysisNode.channels *
                                c2::hard::RG_BUFFER_SIZE);
 
-    constexpr std::size_t analysisSize = 256;
+    constexpr std::size_t analysisSize = 2048;  // power of two
     std::vector<float> analysisBlock(analysisSize);
     std::size_t filled = 0;
+    float engineSampleRate = c2::audio::getEngineSampleRate(app.player.audio);
 
     std::vector<float> amplitudes;
+    std::vector<float> spectrumDb;
+    c2::audio::FrequencyBands bands = {};
+    c2::audio::FrequencyBands smoothedBands = {};
 
     while (running) {
         C2Core::Time::startFrame(app.timeCtx);
@@ -122,9 +127,26 @@ int runApp(AppContext& app) {
                 c2::audio::applyHannWindow(analysisBlock);
                 amplitudes = c2::audio::amplitudeSpectrum(
                     c2::audio::fft(analysisBlock), analysisBlock.size() / 2.0f);
+                // TODO: Change hardcode Frequency
+                bands.bass = c2::audio::bandPeak(amplitudes, analysisSize,
+                                                 engineSampleRate, 20.f, 250.f);
+                bands.mid = c2::audio::bandPeak(
+                    amplitudes, analysisSize, engineSampleRate, 250.f, 4000.f);
+                bands.treble =
+                    c2::audio::bandPeak(amplitudes, analysisSize,
+                                        engineSampleRate, 4000.f, 20000.f);
+
+                spectrumDb = c2::audio::spectrumToDb(amplitudes);
                 filled = 0;
             }
         }
+
+        smoothedBands.bass = c2::audio::smoothEnvelope(smoothedBands.bass,
+                                                       bands.bass, deltaTime);
+        smoothedBands.mid =
+            c2::audio::smoothEnvelope(smoothedBands.mid, bands.mid, deltaTime);
+        smoothedBands.treble = c2::audio::smoothEnvelope(
+            smoothedBands.treble, bands.treble, deltaTime);
 
         const ImGuiWindowFlags debugFlags =
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking;
@@ -138,17 +160,24 @@ int runApp(AppContext& app) {
                 ImGui::TextDisabled("No new samples");
             }
 
+            ImGui::Text("Bass: %.4f | Mid: %.4f | Treble: %.4f", bands.bass,
+                        bands.mid, bands.treble);
+
             if (!amplitudes.empty()) {
                 ImGui::PlotHistogram("Spectrum", amplitudes.data(),
                                      static_cast<int>(amplitudes.size()), 0,
                                      nullptr, 0.0f, FLT_MAX, ImVec2(-1, 160));
+
+                ImGui::PlotLines("Spectrum (dB)", spectrumDb.data(),
+                                 static_cast<int>(spectrumDb.size()), 0,
+                                 nullptr, -80.0f, 0.0f, ImVec2(-1, 180));
             } else {
                 ImGui::TextDisabled("Collecting samples...");
             }
         }
         ImGui::End();
 
-        c2::render::updateRenderer(app.renderer,
+        c2::render::updateRenderer(app.renderer, smoothedBands,
                                    app.player.audio.audioAnalysisNode, app.gpu,
                                    deltaTime);
 

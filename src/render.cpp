@@ -55,7 +55,7 @@ void initRenderer(RendererState& state, const c2::gpu::GPUContext& context,
     // ============================================================================
 
     state.module =
-        c2::utils::createShaderModule(context.device, c2::hard::shader1);
+        c2::utils::createShaderModule(context.device, c2::hard::shader3);
 
     wgpu::TextureDescriptor imageTextureDesc = {};
     imageTextureDesc.dimension = wgpu::TextureDimension::e2D;
@@ -128,6 +128,7 @@ bool isSameSize(RendererState& state, uint32_t width, uint32_t height) {
 }
 
 void updateRenderer(RendererState& state,
+                    const c2::audio::FrequencyBands& bands,
                     c2::audio::AudioAnalysisNode& audioAnalysisnode,
                     const c2::gpu::GPUContext& ctx, float deltaTime) {
     Uniforms un{};
@@ -136,6 +137,7 @@ void updateRenderer(RendererState& state,
         c2::audio::computeAudioIntensity(audioAnalysisnode, deltaTime);
     un.resolution[0] = static_cast<float>(state.activeViewportWidth);
     un.resolution[1] = static_cast<float>(state.activeViewportHeight);
+    un.band = bands;
 
     ctx.queue.WriteBuffer(state.uniformBuffer, 0, &un, sizeof(Uniforms));
 }

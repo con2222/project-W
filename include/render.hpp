@@ -25,6 +25,8 @@ struct Uniforms {
     float time;
     float audioIntensity;
     float resolution[2];
+    c2::audio::FrequencyBands band;
+    float pad_;
 };
 
 struct RendererState {
@@ -52,7 +54,9 @@ void recreateTexture(RendererState& state, const wgpu::Device& device,
 
 void initRenderer(RendererState& state, const c2::gpu::GPUContext& context,
                   const c2::platform::WindowData& data);
+// TODO: Add uniforms struct ???
 void updateRenderer(RendererState& state,
+                    const c2::audio::FrequencyBands& bands,
                     c2::audio::AudioAnalysisNode& audioAnalysisnode,
                     const c2::gpu::GPUContext& ctx, float deltaTime);
 bool renderFrame(const RendererState& state, const c2::gpu::GPUContext& ctx,

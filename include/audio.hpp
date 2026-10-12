@@ -51,9 +51,16 @@ struct PlayerViewData {
     ma_uint64 durationFrames = 0;
 };
 
+struct FrequencyBands {
+    float bass = 0.0f;
+    float mid = 0.0f;
+    float treble = 0.0f;
+};
+
 template <typename T>
 T amplitudeToDbfs(T value) {
-    return 20 * std::log10(value);
+    const T safe_value = std::max(std::abs(value), static_cast<T>(1e-4));
+    return static_cast<T>(20) * std::log10(safe_value);
 }
 
 ma_result initAudio(AudioState& audio);
@@ -65,6 +72,7 @@ ma_result getLengthPCMFrames(AudioState& audio, ma_uint64& outValue);
 ma_result getCursorPCMFrames(AudioState& audio, ma_uint64& outValue);
 ma_result getSoundFormat(AudioState& audio, AudioFormatInfo& outData);
 ma_result soundSeekToPCMFrame(AudioState& audio, ma_uint64 frameIndex);
+ma_uint32 getEngineSampleRate(AudioState& audio);
 bool isSoundPlaying(AudioState& audio);
 bool isSoundAtEnd(AudioState& audio);
 void setSoundVolume(AudioState& audio, float volumeValue);
@@ -90,5 +98,11 @@ std::vector<std::complex<float>> fft(const std::vector<float>& samples);
 std::vector<float> amplitudeSpectrum(
     const std::vector<std::complex<float>>& spectrum, float normalization);
 void applyHannWindow(std::vector<float>& samples);
+std::vector<float> spectrumToDb(const std::vector<float>& amplitudes);
+float binToFrequency(std::size_t bin, std::size_t fftSize, float sampleRate);
+float bandPeak(const std::vector<float>& amplitudes, std::size_t fftSize,
+               float sampleRate, float minFrequency, float maxFrequency);
+float smoothEnvelope(float current, float target, float deltaTime,
+                     float attackTime = 0.02f, float releaseTime = 0.2f);
 
 }  // namespace c2::audio

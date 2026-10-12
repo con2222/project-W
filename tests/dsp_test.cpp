@@ -489,3 +489,52 @@ TEST_CASE("Full DSP chain resolves signal amplitudes", "[dsp][chain]") {
         requireNear(amplitudes[N / 2], 0.5, 1e-4);
     }
 }
+
+TEST_CASE("Spectrum to dBFS conversion translates linear amplitudes",
+          "[dsp][spectrum]") {
+    SECTION("Converts fixed known amplitudes to exact decibel values") {
+        std::vector<float> amplitudes = {1.0f, 0.5f, 0.1f, 0.01f, 0.0f};
+        auto result = spectrumToDb(amplitudes);
+
+        std::vector<float> expected = {0.f, -6.0206f, -20.f, -40.f, -80.f};
+
+        REQUIRE(result.size() == expected.size());
+
+        for (std::size_t i = 0; i < result.size(); ++i) {
+            CAPTURE(i);
+            requireNear(result[i], expected[i], 1e-4);
+        }
+    }
+
+    SECTION("Calculates accurate dBFS peak after full DSP processing chain") {
+        constexpr std::size_t N = 1024;
+        auto samples = makeCosine(N, 10, 0.5f);
+
+        applyHannWindow(samples);
+        auto amplitudes = amplitudeSpectrum(fft(samples), N / 2.0f);
+        auto spectrumDb = spectrumToDb(amplitudes);
+
+        REQUIRE(amplitudes.size() > 10);
+        REQUIRE(spectrumDb.size() == amplitudes.size());
+
+        requireNear(amplitudes[10], 0.5f, 1e-4);
+        requireNear(spectrumDb[10], -6.0206f, 1e-3);
+    }
+}
+
+TEST_CASE("Bin to frequency conversion calculates correct Hz",
+          "[dsp][spectrum]") {
+    SECTION("Calculates correct frequency for standard bins") {
+        requireNear(binToFrequency(10, 2048, 48000.f), 234.375f);
+        requireNear(binToFrequency(1024, 2048, 48000.f),
+                    24000.f);  // Nyquist frequency
+    }
+
+    SECTION("Bin 0 (DC offset) always returns 0 Hz") {
+        requireNear(binToFrequency(0, 2048, 48000.f), 0.0f);
+    }
+
+    SECTION("Safely handles zero FFT size without dividing by zero") {
+        requireNear(binToFrequency(10, 0, 48000.f), 0.0f);
+    }
+}
