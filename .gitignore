@@ -3,10 +3,10 @@ CMakeCache.txt
 CMakeFiles/
 Makefile
 cmake_install.cmake
-compile_commands.json
 build/
 out/
 temp/
+.vscode/
 
 .idea/
 Testing/
@@ -20,9 +20,10 @@ Testing/
 .vs/
 imgui.ini
 *.mp3
-
 *.spv
-*.json
+
+compile_commands.json
+CMakeUserPresets.json
 
 .DS_Store
 Thumbs.db
