@@ -69,6 +69,12 @@ int runApp(AppContext& app) {
     std::vector<float> samples(app.player.audio.audioAnalysisNode.channels *
                                c2::hard::RG_BUFFER_SIZE);
 
+    constexpr std::size_t analysisSize = 2048;
+    std::vector<float> analysisBlock(analysisSize);
+    std::size_t filled = 0;
+
+    std::vector<float> amplitudes;
+
     while (running) {
         C2Core::Time::startFrame(app.timeCtx);
         float deltaTime = C2Core::Time::getDeltaTime(app.timeCtx);
@@ -109,6 +115,17 @@ int runApp(AppContext& app) {
             C2Core::Log::info("peak: %.2f", peak);
         }
 
+        for (std::size_t i = 0; i < framesRead; i++) {
+            analysisBlock[filled] =
+                samples[i * app.player.audio.audioAnalysisNode.channels];
+            filled++;
+            if (filled == analysisSize) {
+                amplitudes =
+                    c2::audio::amplitudeSpectrum(c2::audio::fft(analysisBlock));
+                filled = 0;
+            }
+        }
+
         const ImGuiWindowFlags debugFlags =
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking;
 
@@ -119,6 +136,14 @@ int runApp(AppContext& app) {
                 ImGui::Text("Peak: %.4f", peak);
             } else {
                 ImGui::TextDisabled("No new samples");
+            }
+
+            if (!amplitudes.empty()) {
+                ImGui::PlotHistogram("Spectrum", amplitudes.data(),
+                                     static_cast<int>(amplitudes.size()), 0,
+                                     nullptr, 0.0f, FLT_MAX, ImVec2(-1, 160));
+            } else {
+                ImGui::TextDisabled("Collecting samples...");
             }
         }
         ImGui::End();

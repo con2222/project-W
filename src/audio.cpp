@@ -1,7 +1,9 @@
 #include <C2Core/c2_log.hpp>
 #include <algorithm>
 #include <audio.hpp>
+#include <bit>
 #include <hardcode.hpp>
+#include <numbers>
 
 namespace c2::audio {
 
@@ -259,6 +261,104 @@ ma_uint32 readAnalysisFrames(AudioAnalysisNode& node, float* framesOut,
     }
 
     return frameOffset;
+}
+
+#include <cmath>
+#include <complex>
+#include <numbers>
+#include <vector>
+
+std::vector<std::complex<float>> dft(const std::vector<float>& samples) {
+    const std::size_t N = samples.size();
+    constexpr float pi = std::numbers::pi_v<float>;
+    std::vector<std::complex<float>> result(N);
+
+    for (std::size_t k = 0; k < N; ++k) {
+        float real = 0.0f;
+        float imag = 0.0f;
+
+        for (std::size_t n = 0; n < N; ++n) {
+            float angle = 2.0f * pi * k * n / N;
+
+            real += samples[n] * std::cos(angle);
+            imag -= samples[n] * std::sin(angle);
+        }
+        result[k] = std::complex<float>(real, imag);
+    }
+    return result;
+}
+
+std::vector<float> amplitudeSpectrum(
+    const std::vector<std::complex<float>>& spectrum) {
+    const std::size_t N = spectrum.size();
+
+    if (N == 0) {
+        return {};
+    }
+
+    std::vector<float> result(N / 2 + 1);
+
+    for (std::size_t k = 0; k < result.size(); k++) {
+        if (k == 0 || (N % 2 == 0 && k == N / 2)) {
+            result[k] = std::abs(spectrum[k]) / N;
+        } else {
+            result[k] = std::abs(spectrum[k]) * 2.0f / N;
+        }
+    }
+    return result;
+}
+
+std::vector<std::complex<float>> fft(
+    const std::vector<std::complex<float>>& samples) {
+    const std::size_t N = samples.size();
+
+    if (!std::has_single_bit(N)) {
+        C2Core::Log::error("Samples vector size must be a power of 2 (got %zu)",
+                           N);
+        return {};
+    }
+
+    if (N == 1) {
+        return samples;
+    }
+
+    std::vector<std::complex<float>> even;
+    std::vector<std::complex<float>> odd;
+    even.reserve(N / 2.0f);
+    odd.reserve(N / 2.0f);
+
+    std::vector<std::complex<float>> result(N);
+
+    for (std::size_t i = 0; i < N; i += 2) {
+        even.push_back(samples[i]);
+        odd.push_back(samples[i + 1]);
+    }
+
+    auto E = fft(even);
+    auto O = fft(odd);
+
+    for (std::size_t k = 0; k < N / 2; ++k) {
+        float angle = -2.0 * std::numbers::pi * k / N;
+
+        std::complex<float> w{std::cos(angle), std::sin(angle)};
+
+        auto t = w * O[k];
+
+        result[k] = E[k] + t;
+        result[k + N / 2] = E[k] - t;
+    }
+
+    return result;
+}
+std::vector<std::complex<float>> fft(const std::vector<float>& samples) {
+    std::vector<std::complex<float>> complexSamples;
+    complexSamples.reserve(samples.size());
+
+    for (float sample : samples) {
+        complexSamples.emplace_back(sample, 0.f);
+    }
+
+    return fft(complexSamples);
 }
 
 }  // namespace c2::audio

@@ -2,7 +2,9 @@
 
 #include <atomic>
 #include <cmath>
+#include <complex>
 #include <string>
+#include <vector>
 
 extern "C" {
 #include <miniaudio.h>
@@ -80,5 +82,12 @@ float computeAudioIntensity(AudioAnalysisNode& node, float deltaTime);
 
 ma_uint32 readAnalysisFrames(AudioAnalysisNode& node, float* framesOut,
                              ma_uint32 frameCountOut);
+
+std::vector<std::complex<float>> dft(const std::vector<float>& samples);
+std::vector<std::complex<float>> fft(
+    const std::vector<std::complex<double>>& samples);
+std::vector<std::complex<float>> fft(const std::vector<float>& samples);
+std::vector<float> amplitudeSpectrum(
+    const std::vector<std::complex<float>>& spectrum);
 
 }  // namespace c2::audio
