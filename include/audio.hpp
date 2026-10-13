@@ -104,5 +104,6 @@ float bandPeak(const std::vector<float>& amplitudes, std::size_t fftSize,
                float sampleRate, float minFrequency, float maxFrequency);
 float smoothEnvelope(float current, float target, float deltaTime,
                      float attackTime = 0.02f, float releaseTime = 0.2f);
+float amplitudeToIntensity(float amplitude, float minDb, float maxDb);
 
 }  // namespace c2::audio

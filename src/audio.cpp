@@ -168,6 +168,10 @@ ma_result initAudioAnalysisNode(AudioState& audio) {
     result = ma_pcm_rb_init(ma_format_f32, channels, c2::hard::RG_BUFFER_SIZE,
                             nullptr, nullptr,
                             &audio.audioAnalysisNode.pcmRingBuffer);
+    if (result != MA_SUCCESS) {
+        C2Core::Log::error("Can't init ring buffer");
+        return result;
+    }
 
     ma_uint32 inputChannels[1];   // array size = input bus count;
     ma_uint32 outputChannels[1];  // array size = output bus count
@@ -193,6 +197,8 @@ ma_result initAudioAnalysisNode(AudioState& audio) {
     if (result == MA_SUCCESS) {
         audio.audioAnalysisNode.channels = channels;
         audio.analysisNodeInitialized = true;
+    } else {
+        ma_pcm_rb_uninit(&audio.audioAnalysisNode.pcmRingBuffer);
     }
 
     return result;
@@ -426,5 +432,15 @@ float smoothEnvelope(float current, float target, float deltaTime,
         alpha = 1 - std::exp(-deltaTime / releaseTime);
     }
     return current + alpha * (target - current);
+}
+
+float amplitudeToIntensity(float amplitude, float minDb, float maxDb) {
+    float intensity = 0.f;
+    if (maxDb > minDb) {
+        intensity = std::clamp(
+            (amplitudeToDbfs<float>(amplitude) - minDb) / (maxDb - minDb), 0.f,
+            1.f);
+    }
+    return intensity;
 }
 }  // namespace c2::audio

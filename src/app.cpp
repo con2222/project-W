@@ -71,6 +71,8 @@ int runApp(AppContext& app) {
                                c2::hard::RG_BUFFER_SIZE);
 
     constexpr std::size_t analysisSize = 2048;  // power of two
+    constexpr std::size_t windowedBlock = analysisSize;
+
     std::vector<float> analysisBlock(analysisSize);
     std::size_t filled = 0;
     float engineSampleRate = c2::audio::getEngineSampleRate(app.player.audio);
@@ -141,12 +143,18 @@ int runApp(AppContext& app) {
             }
         }
 
-        smoothedBands.bass = c2::audio::smoothEnvelope(smoothedBands.bass,
-                                                       bands.bass, deltaTime);
-        smoothedBands.mid =
-            c2::audio::smoothEnvelope(smoothedBands.mid, bands.mid, deltaTime);
+        smoothedBands.bass = c2::audio::smoothEnvelope(
+            smoothedBands.bass,
+            c2::audio::amplitudeToIntensity(bands.bass, -60.f, -12.f),
+            deltaTime);
+        smoothedBands.mid = c2::audio::smoothEnvelope(
+            smoothedBands.mid,
+            c2::audio::amplitudeToIntensity(bands.mid, -60.f, -12.f),
+            deltaTime);
         smoothedBands.treble = c2::audio::smoothEnvelope(
-            smoothedBands.treble, bands.treble, deltaTime);
+            smoothedBands.treble,
+            c2::audio::amplitudeToIntensity(bands.treble, -60.f, -12.f),
+            deltaTime);
 
         const ImGuiWindowFlags debugFlags =
             ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDocking;
@@ -162,6 +170,10 @@ int runApp(AppContext& app) {
 
             ImGui::Text("Bass: %.4f | Mid: %.4f | Treble: %.4f", bands.bass,
                         bands.mid, bands.treble);
+
+            ImGui::Text(
+                "SmootBass: %.4f | SmoothMid: %.4f | SmoothTreble: %.4f",
+                smoothedBands.bass, smoothedBands.mid, smoothedBands.treble);
 
             if (!amplitudes.empty()) {
                 ImGui::PlotHistogram("Spectrum", amplitudes.data(),
@@ -218,6 +230,7 @@ void shutdownApp(AppContext& app) {
 
     if (audioState.analysisNodeInitialized) {
         ma_node_uninit(&audioState.audioAnalysisNode, nullptr);
+        ma_pcm_rb_uninit(&audioState.audioAnalysisNode.pcmRingBuffer);
         audioState.analysisNodeInitialized = false;
     }
 

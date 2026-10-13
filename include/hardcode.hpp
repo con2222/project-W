@@ -550,10 +550,10 @@ fn scene_fs(
 
     let t = uniforms.time;
 
-    let bass = audioLevel(uniforms.bands.bass);
-    let mid = audioLevel(uniforms.bands.mid);
-    let treble = audioLevel(uniforms.bands.treble);
-    let energy = audioLevel(uniforms.audioIntensity);
+    let bass = uniforms.bands.bass;
+    let mid = uniforms.bands.mid;
+    let treble = uniforms.bands.treble;
+    let energy = uniforms.audioIntensity;
 
     let cyan = vec3f(0.05, 0.9, 2.0);
     let violet = vec3f(0.65, 0.15, 1.5);
@@ -702,7 +702,7 @@ fn scene_fs(
         uv * vec2f(29.0, 21.0) +
         vec2f(
             t * 0.45,
-            -t * (0.8 + treble * 2.5)
+            -t * 0.8
         );
 
     let sparkCell = floor(sparkUV);
