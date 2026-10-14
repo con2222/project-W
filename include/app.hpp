@@ -14,6 +14,7 @@ struct AppContext {
     platform::WindowData window{};
     render::RendererState renderer{};
 
+    audio::AudioAnalysisState analysisState;
     audio::PlayerState player{};
     audio::PlayerViewData viewData{};
     ui::MusicPlayerUIState ui{};
@@ -30,5 +31,6 @@ struct AppContext {
 bool initApp(AppContext& app);
 int runApp(AppContext& app);
 void shutdownApp(AppContext& app);
+void showDebugWindow(AppContext& app, ma_uint32 framesRead);
 
 }  // namespace c2

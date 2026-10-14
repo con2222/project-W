@@ -57,6 +57,47 @@ struct FrequencyBands {
     float treble = 0.0f;
 };
 
+struct Range {
+    float min = 0.f;
+    float max = 0.f;
+};
+
+using BandRange = Range;
+
+struct AudioAnalysisConfig {
+    BandRange bassRange{20.f, 250.f};
+    BandRange midRange{250.f, 4000.f};
+    BandRange trebleRange{4000.f, 20000.f};
+
+    Range intensityDbRange{-60.f, -12.f};
+
+    std::size_t analysisSize = 2048;
+    std::size_t hopSize = 512;
+
+    float attackTime = 0.02f;  // 20ms
+    float releaseTime = 0.2f;  // 200ms
+};
+
+struct AudioAnalysisResult {
+    float peak = 0.f;
+    FrequencyBands bands;
+    FrequencyBands smoothedBands;
+    std::vector<float> amplitudes;
+    std::vector<float> spectrumDb;
+};
+
+struct AudioAnalysisState {
+    std::vector<float> analysisBlock;
+    std::vector<float> windowedBlock;
+    std::size_t filled = 0;
+
+    ma_uint32 channels = 0;
+    ma_uint32 sampleRate = 0;
+
+    AudioAnalysisConfig config;
+    AudioAnalysisResult result;
+};
+
 template <typename T>
 T amplitudeToDbfs(T value) {
     const T safe_value = std::max(std::abs(value), static_cast<T>(1e-4));
@@ -64,6 +105,7 @@ T amplitudeToDbfs(T value) {
 }
 
 ma_result initAudio(AudioState& audio);
+
 void shutdownAudio(AudioState& audio);
 ma_result loadSoundFromFile(AudioState& audio, const std::string& filename);
 ma_result playSound(AudioState& audio);
@@ -73,6 +115,7 @@ ma_result getCursorPCMFrames(AudioState& audio, ma_uint64& outValue);
 ma_result getSoundFormat(AudioState& audio, AudioFormatInfo& outData);
 ma_result soundSeekToPCMFrame(AudioState& audio, ma_uint64 frameIndex);
 ma_uint32 getEngineSampleRate(AudioState& audio);
+ma_uint32 getEngineChannels(AudioState& audio);
 bool isSoundPlaying(AudioState& audio);
 bool isSoundAtEnd(AudioState& audio);
 void setSoundVolume(AudioState& audio, float volumeValue);
@@ -82,7 +125,14 @@ void processAudioAnalysisNode(ma_node* pNode, const float** ppFramesIn,
                               ma_uint32* pFrameCountIn, float** ppFramesOut,
                               ma_uint32* pFrameCountOut);
 
+void processPCM(const std::vector<float>& samples, ma_uint32 framesRead,
+                AudioAnalysisState& state);
+void updateAnalysisSmoothing(AudioAnalysisState& state, float deltaTime);
+
 ma_result initAudioAnalysisNode(AudioState& audio);
+bool initAudioAnalysis(AudioAnalysisState& state,
+                       const AudioAnalysisConfig& config, ma_uint32 channels,
+                       ma_uint32 sampleRate);
 ma_result attachAudioAnalysisNodeToEngine(AudioState& audio);
 ma_result attachAudioAnalysisNodeToSound(AudioState& audio);
 
@@ -105,5 +155,6 @@ float bandPeak(const std::vector<float>& amplitudes, std::size_t fftSize,
 float smoothEnvelope(float current, float target, float deltaTime,
                      float attackTime = 0.02f, float releaseTime = 0.2f);
 float amplitudeToIntensity(float amplitude, float minDb, float maxDb);
+bool isFrequencyRangeValid(const Range& range);
 
 }  // namespace c2::audio

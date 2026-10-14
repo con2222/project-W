@@ -21,9 +21,108 @@ ma_result initAudio(AudioState& audio) {
     return result;
 }
 
+bool isFrequencyRangeValid(const Range& range) {
+    return range.max > range.min && range.min >= 0 &&
+           std::isfinite(range.max) && std::isfinite(range.min);
+}
+
+bool initAudioAnalysis(AudioAnalysisState& state,
+                       const AudioAnalysisConfig& config, ma_uint32 channels,
+                       ma_uint32 sampleRate) {
+    if (!std::has_single_bit(config.analysisSize) || config.hopSize == 0 ||
+        config.hopSize > config.analysisSize) {
+        C2Core::Log::error("Incorrect config");
+        return false;
+    }
+
+    if (!isFrequencyRangeValid(config.bassRange) ||
+        !isFrequencyRangeValid(config.midRange) ||
+        !isFrequencyRangeValid(config.trebleRange)) {
+        C2Core::Log::error("Incorrect bands range");
+        return false;
+    }
+
+    if (config.intensityDbRange.min >= config.intensityDbRange.max ||
+        !std::isfinite(config.intensityDbRange.min) ||
+        !std::isfinite(config.intensityDbRange.max)) {
+        C2Core::Log::error("Incorrect intensity Db range");
+        return false;
+    }
+
+    if (config.releaseTime <= 0 || config.attackTime <= 0 ||
+        !std::isfinite(config.releaseTime) ||
+        !std::isfinite(config.attackTime)) {
+        C2Core::Log::error("Incorrect release time or attack time");
+        return false;
+    }
+
+    if (sampleRate <= 0 || channels <= 0) {
+        C2Core::Log::error("Incorrect sample rate or channels");
+        return false;
+    }
+
+    const std::size_t& analysisSize = config.analysisSize;
+    state.config = config;
+    state.filled = 0;
+    state.analysisBlock.resize(analysisSize);
+    state.windowedBlock.resize(analysisSize);
+    state.result = AudioAnalysisResult{};
+    state.sampleRate = sampleRate;
+    state.channels = channels;
+
+    return true;
+}
+
+void processPCM(const std::vector<float>& samples, ma_uint32 framesRead,
+                AudioAnalysisState& state) {
+    if (framesRead == 0) {
+        return;
+    }
+
+    float peak = 0.f;
+    for (std::size_t i = 0; i < framesRead * state.channels; i++) {
+        float sample = samples[i];
+        peak = std::max(peak, std::abs(sample));
+    }
+    state.result.peak = peak;
+
+    for (std::size_t i = 0; i < framesRead; i++) {
+        state.analysisBlock[state.filled] = samples[i * state.channels];
+        state.filled++;
+        if (state.filled == state.config.analysisSize) {
+            state.windowedBlock = state.analysisBlock;
+            c2::audio::applyHannWindow(state.windowedBlock);
+
+            state.result.amplitudes = c2::audio::amplitudeSpectrum(
+                c2::audio::fft(state.windowedBlock),
+                state.windowedBlock.size() / 2.0f);
+
+            std::copy(state.analysisBlock.begin() + state.config.hopSize,
+                      state.analysisBlock.end(), state.analysisBlock.begin());
+
+            state.result.bands.bass = c2::audio::bandPeak(
+                state.result.amplitudes, state.config.analysisSize,
+                state.sampleRate, state.config.bassRange.min,
+                state.config.bassRange.max);
+            state.result.bands.mid = c2::audio::bandPeak(
+                state.result.amplitudes, state.config.analysisSize,
+                state.sampleRate, state.config.midRange.min,
+                state.config.midRange.max);
+            state.result.bands.treble = c2::audio::bandPeak(
+                state.result.amplitudes, state.config.analysisSize,
+                state.sampleRate, state.config.trebleRange.min,
+                state.config.trebleRange.max);
+
+            state.result.spectrumDb =
+                c2::audio::spectrumToDb(state.result.amplitudes);
+            state.filled = state.config.analysisSize - state.config.hopSize;
+        }
+    }
+}
+
 void shutdownAudio(AudioState& audio) {
     uninitSound(audio);
-    ma_node_uninit(&audio.audioAnalysisNode, nullptr);  //
+    ma_node_uninit(&audio.audioAnalysisNode, nullptr);
     if (audio.engine != nullptr) {
         ma_engine_uninit(audio.engine);
         delete audio.engine;
@@ -78,6 +177,10 @@ ma_result soundSeekToPCMFrame(AudioState& audio, ma_uint64 frameIndex) {
 
 ma_uint32 getEngineSampleRate(AudioState& audio) {
     return ma_engine_get_sample_rate(audio.engine);
+}
+
+ma_uint32 getEngineChannels(AudioState& audio) {
+    return ma_engine_get_channels(audio.engine);
 }
 
 void uninitSound(AudioState& audio) {
@@ -442,5 +545,27 @@ float amplitudeToIntensity(float amplitude, float minDb, float maxDb) {
             1.f);
     }
     return intensity;
+}
+
+void updateAnalysisSmoothing(AudioAnalysisState& state, float deltaTime) {
+    c2::audio::FrequencyBands& smoothedBands = state.result.smoothedBands;
+    smoothedBands.bass = c2::audio::smoothEnvelope(
+        smoothedBands.bass,
+        c2::audio::amplitudeToIntensity(state.result.bands.bass,
+                                        state.config.intensityDbRange.min,
+                                        state.config.intensityDbRange.max),
+        deltaTime, state.config.attackTime, state.config.releaseTime);
+    smoothedBands.mid = c2::audio::smoothEnvelope(
+        smoothedBands.mid,
+        c2::audio::amplitudeToIntensity(state.result.bands.mid,
+                                        state.config.intensityDbRange.min,
+                                        state.config.intensityDbRange.max),
+        deltaTime, state.config.attackTime, state.config.releaseTime);
+    smoothedBands.treble = c2::audio::smoothEnvelope(
+        smoothedBands.treble,
+        c2::audio::amplitudeToIntensity(state.result.bands.treble,
+                                        state.config.intensityDbRange.min,
+                                        state.config.intensityDbRange.max),
+        deltaTime, state.config.attackTime, state.config.releaseTime);
 }
 }  // namespace c2::audio
