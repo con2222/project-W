@@ -776,4 +776,158 @@ fn scene_fs(
 
 )";
 
+inline constexpr const char* shaderBandsTest = R"(
+struct FrequencyBands {
+    bass: f32,
+    mid: f32,
+    treble: f32,
+};
+
+struct Uniforms {
+    time: f32,
+    audioIntensity: f32,
+    resolution: vec2f,
+    bands: FrequencyBands,
+};
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+
+fn segmentDistance(p: vec2f, a: vec2f, b: vec2f) -> f32 {
+    let ab = b - a;
+    let h = clamp(dot(p - a, ab) / max(dot(ab, ab), 0.000001), 0.0, 1.0);
+    return length(p - a - h * ab);
+}
+
+// Signed distance to a six-sided crystal: negative inside, positive outside.
+fn crystalDistance(p: vec2f, width: f32, bottom: f32, top: f32) -> f32 {
+    let points = array<vec2f, 6>(
+        vec2f(0.0, top),
+        vec2f(-width, top - 0.18),
+        vec2f(-width, bottom + 0.12),
+        vec2f(0.0, bottom),
+        vec2f(width, bottom + 0.12),
+        vec2f(width, top - 0.18)
+    );
+    var distance = 100.0;
+    var inside = true;
+    for (var i = 0u; i < 6u; i += 1u) {
+        let a = points[i];
+        let b = points[(i + 1u) % 6u];
+        let e = b - a;
+        let q = p - a;
+        inside = inside && (e.x * q.y - e.y * q.x >= 0.0);
+        distance = min(distance, segmentDistance(p, a, b));
+    }
+    return select(distance, -distance, inside);
+}
+
+// RGB contains emitted light; A is the solid silhouette mask.
+fn crystal(p: vec2f, level: f32, tint: vec3f, time: f32, aa: f32) -> vec4f {
+    let bottom = -0.42;
+    let top = 0.30 + 0.42 * level;
+    let width = 0.125 + 0.020 * level;
+    let d = crystalDistance(p, width, bottom, top);
+    let mask = 1.0 - smoothstep(-aa, aa, d);
+    let edge = abs(d);
+
+    // Different face brightness suggests volume without a mesh or ray marching.
+    var face = select(0.10, 0.26, p.x > 0.0);
+    face += 0.22 * smoothstep(top - 0.19, top - 0.16, p.y);
+    let streak = exp(-abs(p.x + 0.035 + p.y * 0.035) * 65.0);
+    var color = tint * mask * (face + 0.32 * streak) * (0.18 + 0.85 * level);
+
+    // Time moves light at a constant speed; it does not change crystal size.
+    let flow = pow(0.5 + 0.5 * sin(p.y * 10.0 - time * 0.9), 6.0);
+    color += tint * mask * flow * level * 0.22;
+
+    let apex = vec2f(0.0, top);
+    let foot = vec2f(0.0, bottom);
+    let junction = vec2f(0.0, bottom + 0.17);
+    var facetDistance = segmentDistance(p, apex, foot);
+    facetDistance = min(facetDistance,
+        segmentDistance(p, vec2f(-width, top - 0.18), junction));
+    facetDistance = min(facetDistance,
+        segmentDistance(p, vec2f(width, top - 0.18), junction));
+
+    let edgeCore = 1.0 - smoothstep(aa * 0.25, aa * 1.6, edge);
+    let facetCore = 1.0 - smoothstep(aa * 0.2, aa * 1.2, facetDistance);
+    let power = 0.18 + 1.25 * level;
+    color += tint * power * (0.62 * edgeCore
+        + 0.30 * exp(-edge * 70.0) + 0.09 * exp(-edge * 18.0));
+    color += tint * facetCore * mask * (0.08 + level * 0.38);
+    color += vec3f(0.7, 0.85, 1.0) * edgeCore * level * 0.14;
+    return vec4f(color, mask);
+}
+
+@vertex
+fn scene_vs(@builtin(vertex_index) index: u32) -> @builtin(position) vec4f {
+    let positions = array<vec2f, 3>(
+        vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0)
+    );
+    return vec4f(positions[index], 0.0, 1.0);
+}
+
+@fragment
+fn scene_fs(@builtin(position) fragCoord: vec4f) -> @location(0) vec4f {
+    let resolution = max(uniforms.resolution, vec2f(1.0));
+    let shortSide = min(resolution.x, resolution.y);
+    let aa = 2.0 / shortSide;
+    var p = (2.0 * fragCoord.xy - resolution) / shortSide;
+    p.y = -p.y;
+
+    // Inputs are ALREADY mapped and smoothed to [0, 1] by the CPU.
+    let levels = clamp(vec3f(uniforms.bands.bass, uniforms.bands.mid,
+        uniforms.bands.treble), vec3f(0.0), vec3f(1.0));
+    let tints = array<vec3f, 3>(
+        vec3f(0.08, 0.85, 1.0),
+        vec3f(0.78, 0.18, 1.0),
+        vec3f(1.0, 0.48, 0.12)
+    );
+    let floorY = -0.50;
+    var color = vec3f(0.003, 0.005, 0.013);
+    color += vec3f(0.009, 0.014, 0.032) * exp(-dot(p, p) * 0.8);
+
+    // Backlighting and reflections are drawn before the solid crystals.
+    for (var i = 0u; i < 3u; i += 1u) {
+        let x = (f32(i) - 1.0) * 0.57;
+        let q = p - vec2f(x, 0.0);
+        let level = levels[i];
+        let tint = tints[i];
+
+        let haze = exp(-q.x * q.x * 18.0 - (q.y - 0.08) * (q.y - 0.08) * 2.8);
+        color += tint * haze * (0.012 + 0.075 * level);
+        let pool = vec2f(q.x * 3.2, (p.y - floorY) * 35.0);
+        color += tint * exp(-dot(pool, pool)) * (0.025 + 0.23 * level);
+
+        let reflectedP = vec2f(q.x, 2.0 * floorY - p.y);
+        let reflected = crystal(reflectedP, level, tint, uniforms.time, aa * 1.6);
+        let depth = max(floorY - p.y, 0.0);
+        let reflectionFade = exp(-depth * 7.0)
+            * (1.0 - smoothstep(floorY - aa, floorY + aa, p.y));
+        color += reflected.rgb * reflectionFade * 0.32;
+    }
+
+    for (var i = 0u; i < 3u; i += 1u) {
+        let q = p - vec2f((f32(i) - 1.0) * 0.57, 0.0);
+        let shape = crystal(q, levels[i], tints[i], uniforms.time, aa);
+        color = color * (1.0 - 0.90 * shape.a) + shape.rgb;
+    }
+
+    // Three small meters make the actual independent inputs easy to inspect.
+    for (var i = 0u; i < 3u; i += 1u) {
+        let q = p - vec2f((f32(i) - 1.0) * 0.57, -0.75);
+        let track = (1.0 - smoothstep(0.13, 0.13 + aa, abs(q.x)))
+            * (1.0 - smoothstep(0.003, 0.003 + aa, abs(q.y)));
+        let end = -0.13 + 0.26 * levels[i];
+        let fill = 1.0 - smoothstep(end - aa, end + aa, q.x);
+        color += tints[i] * track * (0.08 + 0.65 * fill * levels[i]);
+    }
+
+    // Exponential tone mapping, then display encoding for your RGBA8Unorm target.
+    color = vec3f(1.0) - exp(-color * 1.35);
+    color = pow(max(color, vec3f(0.0)), vec3f(1.0 / 2.2));
+    return vec4f(color, 1.0);
+}
+)";
+
 }  // namespace c2::hard

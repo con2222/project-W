@@ -54,8 +54,8 @@ void initRenderer(RendererState& state, const c2::gpu::GPUContext& context,
     // Texture settup
     // ============================================================================
 
-    state.module =
-        c2::utils::createShaderModule(context.device, c2::hard::shader3);
+    state.module = c2::utils::createShaderModule(context.device,
+                                                 c2::hard::shaderBandsTest);
 
     wgpu::TextureDescriptor imageTextureDesc = {};
     imageTextureDesc.dimension = wgpu::TextureDimension::e2D;
