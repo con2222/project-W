@@ -1,4 +1,4 @@
-# Music Player
+# Sylvune
 
 A desktop music player written in C++20 with a custom Dear ImGui interface and GPU-powered audio visualizations using WebGPU (Dawn).
 
