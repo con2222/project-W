@@ -6,7 +6,7 @@ The project is built primarily for learning graphics programming, audio processi
 
 ## Demo
 
-[![Watch the demo](https://img.youtube.com/vi/I-_1WFROLrY/hqdefault.jpg)](https://youtu.be/I-_1WFROLrY)
+[![Watch the demo](https://img.youtube.com/vi/I-_1WFROLrY/maxresdefault.jpg)](https://youtu.be/I-_1WFROLrY)
 
 ## Features
 
