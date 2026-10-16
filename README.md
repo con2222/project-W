@@ -52,3 +52,11 @@ This is a personal learning project. Features and architecture are actively evol
 
 This project is licensed under the MIT License.
 See [LICENSE](LICENSE) for details.
+
+## Credits
+
+**Music used in the demo video and all other music:**
+- Track: [Original music](https://www.youtube.com/watch?v=zwHGJgcpJhE)
+- Music by: Hate
+
+Special thanks to the original artist for the music.
