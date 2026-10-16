@@ -4,6 +4,10 @@ A desktop music player written in C++20 with a custom Dear ImGui interface and G
 
 The project is built primarily for learning graphics programming, audio processing, and application development.
 
+## Demo
+
+[![Watch the demo](https://img.youtube.com/vi/I-_1WFROLrY/hqdefault.jpg)](https://youtu.be/I-_1WFROLrY)
+
 ## Features
 
 - Local music library and audio playback
